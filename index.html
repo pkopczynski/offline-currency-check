@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1f4e79">
+  <meta name="description" content="Offline-first currency converter for EUR, PLN and TRY.">
+  <title>Currency Converter</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Currency Converter</h1>
+
+    <form id="converter" autocomplete="off">
+      <label for="amount">Amount</label>
+      <input id="amount" name="amount" type="text" inputmode="decimal" value="1" aria-describedby="amount-error">
+      <p id="amount-error" class="error" hidden>Enter a valid non-negative number.</p>
+
+      <div class="row">
+        <div>
+          <label for="from">From</label>
+          <select id="from" name="from">
+            <option value="EUR" selected>EUR – Euro</option>
+            <option value="PLN">PLN – Polish złoty</option>
+            <option value="TRY">TRY – Turkish lira</option>
+          </select>
+        </div>
+        <div>
+          <label for="to">To</label>
+          <select id="to" name="to">
+            <option value="EUR">EUR – Euro</option>
+            <option value="PLN" selected>PLN – Polish złoty</option>
+            <option value="TRY">TRY – Turkish lira</option>
+          </select>
+        </div>
+      </div>
+    </form>
+
+    <section class="result" aria-live="polite">
+      <output id="result" for="amount from to">—</output>
+      <p id="rate" class="rate"></p>
+    </section>
+
+    <section id="status" class="status" data-state="loading" role="status">
+      <p id="status-title" class="status-title">Loading rates…</p>
+      <p id="status-detail" class="status-detail"></p>
+    </section>
+
+    <button id="refresh" type="button">Refresh rates</button>
+
+    <p class="source">Rates: European Central Bank via <a href="https://frankfurter.dev/" rel="noopener">Frankfurter</a>. Published once per working day.</p>
+  </main>
+</body>
+</html>

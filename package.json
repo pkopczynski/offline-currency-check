@@ -1,0 +1,13 @@
+{
+  "name": "currency-converter-pwa",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Offline-first currency converter PWA for EUR, PLN and TRY.",
+  "type": "module",
+  "engines": {
+    "node": ">=18.6"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
