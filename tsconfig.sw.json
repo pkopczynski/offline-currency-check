@@ -1,0 +1,9 @@
+{
+  // The service worker runs in a worker scope, whose globals conflict with the DOM lib.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "WebWorker"],
+    "types": []
+  },
+  "include": ["src/sw.ts"]
+}

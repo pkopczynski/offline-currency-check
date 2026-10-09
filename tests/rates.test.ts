@@ -4,29 +4,32 @@ import {
   CACHE_KEY, SCHEMA, API_URL,
   validateRates, loadCache, saveCache, fetchRates, refreshRates,
   convert, parseAmount, formatAge,
-} from '../rates.js';
+} from '../src/rates.ts';
+import type { CacheEntry, FetchFn, KeyValueStorage } from '../src/rates.ts';
 
 const RATES = { EUR: 1, PLN: 4.3825, TRY: 54.9822 };
 const API_PAYLOAD = { amount: 1.0, base: 'EUR', date: '2026-10-07', rates: { PLN: 4.3825, TRY: 54.9822 } };
 const NOW = Date.parse('2026-10-07T20:41:12.000Z');
 
-function memoryStorage(initial = {}) {
-  const data = { ...initial };
+function memoryStorage(initial: Record<string, string> = {}) {
+  const data: Record<string, string> = { ...initial };
   return {
     data,
-    getItem: (k) => (k in data ? data[k] : null),
-    setItem: (k, v) => { data[k] = String(v); },
-  };
+    getItem: (k: string) => (k in data ? data[k]! : null),
+    setItem: (k: string, v: string) => { data[k] = String(v); },
+  } satisfies KeyValueStorage & { data: Record<string, string> };
 }
 
-const okFetch = (payload = API_PAYLOAD) => async () => ({ ok: true, status: 200, json: async () => payload });
-const validEntry = (overrides = {}) => ({
+const okFetch = (payload: unknown = API_PAYLOAD): FetchFn => async () => ({ ok: true, status: 200, json: async () => payload });
+// Overrides may deliberately break the entry (wrong schema, missing rates, ...), hence the cast.
+const validEntry = (overrides: Record<string, unknown> = {}) => ({
   schema: SCHEMA, provider: 'frankfurter', base: 'EUR', rates: { ...RATES },
   rateDate: '2026-10-06', fetchedAt: '2026-10-06T18:00:00.000Z', ...overrides,
-});
+}) as CacheEntry;
 
 describe('convert', () => {
-  const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} ≈ ${expected}`);
+  const close = (actual: number | null, expected: number) =>
+    assert.ok(actual !== null && Math.abs(actual - expected) < 1e-9, `${actual} ≈ ${expected}`);
 
   test('all six currency pairs', () => {
     close(convert(10, 'EUR', 'PLN', RATES), 43.825);
@@ -113,7 +116,7 @@ describe('cache', () => {
   });
 
   test('storage errors do not throw', () => {
-    const broken = { getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('full'); } };
+    const broken: KeyValueStorage = { getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('full'); } };
     assert.equal(loadCache(broken), null);
     assert.equal(saveCache(broken, validEntry()), false);
   });
@@ -121,8 +124,8 @@ describe('cache', () => {
 
 describe('fetchRates', () => {
   test('requests the Frankfurter URL and builds a cache entry', async () => {
-    let calledUrl;
-    const fetchFn = async (url) => { calledUrl = url; return okFetch()(); };
+    let calledUrl: string | undefined;
+    const fetchFn: FetchFn = async (url, init) => { calledUrl = url; return okFetch()(url, init); };
     const entry = await fetchRates({ fetchFn, now: () => NOW });
     assert.equal(calledUrl, API_URL);
     assert.equal(API_URL, 'https://api.frankfurter.dev/v1/latest?base=EUR&symbols=PLN,TRY');
@@ -133,7 +136,7 @@ describe('fetchRates', () => {
   });
 
   test('times out', async () => {
-    const hang = (_url, { signal }) => new Promise((_, reject) => {
+    const hang: FetchFn = (_url, { signal }) => new Promise((_, reject) => {
       signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
     });
     await assert.rejects(fetchRates({ fetchFn: hang, now: () => NOW, timeoutMs: 10 }), { reason: 'timeout' });
@@ -141,7 +144,7 @@ describe('fetchRates', () => {
 
   test('times out while reading the response body', async () => {
     // Headers arrive, then the body stalls; like real fetch, json() rejects on abort.
-    const stallBody = async (_url, { signal }) => ({
+    const stallBody: FetchFn = async (_url, { signal }) => ({
       ok: true,
       status: 200,
       json: () => new Promise((_, reject) => {
@@ -161,7 +164,7 @@ describe('refreshRates', () => {
     assert.deepEqual(loadCache(storage), result.entry);
   });
 
-  const failures = {
+  const failures: Record<'network' | 'http' | 'invalid', FetchFn> = {
     network: async () => { throw new TypeError('Failed to fetch'); },
     http: async () => ({ ok: false, status: 500, json: async () => ({}) }),
     invalid: okFetch({ base: 'EUR', date: '2026-10-07', rates: { PLN: 4.38 } }),
@@ -181,7 +184,7 @@ describe('refreshRates', () => {
 
   test('unparseable JSON counts as invalid', async () => {
     const storage = memoryStorage({ [CACHE_KEY]: JSON.stringify(validEntry()) });
-    const fetchFn = async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad'); } });
+    const fetchFn: FetchFn = async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad'); } });
     const result = await refreshRates({ storage, fetchFn, now: () => NOW });
     assert.equal(result.status, 'cached');
     assert.equal(result.reason, 'invalid');
@@ -193,7 +196,7 @@ describe('refreshRates', () => {
   });
 
   test('if saving failed, a later failure falls back to the in-memory rates', async () => {
-    const noSave = { getItem: () => null, setItem: () => { throw new Error('full'); } };
+    const noSave: KeyValueStorage = { getItem: () => null, setItem: () => { throw new Error('full'); } };
     const first = await refreshRates({ storage: noSave, fetchFn: okFetch(), now: () => NOW });
     assert.equal(first.status, 'current');
 
@@ -204,18 +207,18 @@ describe('refreshRates', () => {
   test('fallback prefers whichever of memory and storage is newer', async () => {
     const older = validEntry({ fetchedAt: '2026-10-05T10:00:00.000Z' });
     const newer = validEntry({ fetchedAt: '2026-10-07T10:00:00.000Z' });
-    const run = (stored, fallback) => refreshRates({
+    const run = (stored: CacheEntry, fallback: CacheEntry) => refreshRates({
       storage: memoryStorage({ [CACHE_KEY]: JSON.stringify(stored) }),
       fetchFn: failures.network, now: () => NOW, fallback,
     });
     assert.deepEqual((await run(older, newer)).entry, newer);
     assert.deepEqual((await run(newer, older)).entry, newer);
-    assert.deepEqual((await run(newer, { bogus: true })).entry, newer);
+    assert.deepEqual((await run(newer, { bogus: true } as unknown as CacheEntry)).entry, newer);
   });
 });
 
 describe('formatAge', () => {
-  const at = (msAgo) => new Date(NOW - msAgo).toISOString();
+  const at = (msAgo: number) => new Date(NOW - msAgo).toISOString();
   test('labels', () => {
     assert.equal(formatAge(at(10_000), NOW), 'just now');
     assert.equal(formatAge(at(5 * 60_000), NOW), '5 min ago');

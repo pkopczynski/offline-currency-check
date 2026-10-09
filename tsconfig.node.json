@@ -1,0 +1,9 @@
+{
+  // Tests and build config run in Node. rates.ts is checked here too, which proves it is DOM-free.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"]
+  },
+  "include": ["tests", "scripts", "src/rates.ts", "vite.config.ts"]
+}

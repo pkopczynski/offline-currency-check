@@ -1,15 +1,19 @@
 {
+  "id": "./",
   "name": "Currency Converter",
   "short_name": "Converter",
   "description": "Offline-first currency converter for EUR, PLN and TRY.",
+  "lang": "en",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f4f6f9",
-  "theme_color": "#1f4e79",
+  "background_color": "#060918",
+  "theme_color": "#0b1030",
+  "categories": ["finance", "utilities"],
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

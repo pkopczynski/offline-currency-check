@@ -1,0 +1,10 @@
+{
+  // Browser app code. See tsconfig.node.json (tests, build config) and tsconfig.sw.json (service worker).
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"]
+  },
+  "include": ["src"],
+  "exclude": ["src/sw.ts"]
+}

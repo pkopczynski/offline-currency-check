@@ -1,17 +1,15 @@
-// Bump CACHE_VERSION whenever any file in APP_SHELL changes.
-const CACHE_VERSION = 'v1';
-const CACHE_NAME = `fx-shell-${CACHE_VERSION}`;
-const APP_SHELL = [
-  './',
-  './index.html',
-  './styles.css',
-  './app.js',
-  './rates.js',
-  './manifest.webmanifest',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/icon-maskable-512.png',
-];
+/// <reference lib="webworker" />
+// Built to /sw.js (see vite.config.ts). Must not import anything: a classic service
+// worker script cannot load ES module chunks.
+
+declare const self: ServiceWorkerGlobalScope;
+// Replaced at build time: every built file (relative to this script) and a hash of their contents.
+declare const __PRECACHE_FILES__: string[];
+declare const __PRECACHE_VERSION__: string;
+
+const CACHE_PREFIX = 'fx-shell-';
+const CACHE_NAME = CACHE_PREFIX + __PRECACHE_VERSION__;
+const APP_SHELL = ['./', ...__PRECACHE_FILES__];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -26,14 +24,14 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(
-        keys.filter((k) => k.startsWith('fx-shell-') && k !== CACHE_NAME).map((k) => caches.delete(k)),
+        keys.filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME).map((k) => caches.delete(k)),
       ))
       .then(() => self.clients.claim()),
   );
 });
 
 // Cache-first for the app's own files. Cross-origin requests (the rate API) are
-// not intercepted; app.js handles their failure and falls back to localStorage.
+// not intercepted; the app handles their failure and falls back to localStorage.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -50,3 +48,5 @@ self.addEventListener('fetch', (event) => {
     caches.match(request, { ignoreSearch: true }).then((cached) => cached || fetch(request)),
   );
 });
+
+export {};

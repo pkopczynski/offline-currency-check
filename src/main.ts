@@ -1,44 +1,52 @@
+import './styles/main.css';
 import {
   loadCache, refreshRates, convert, parseAmount, formatAge,
-} from './rates.js';
+} from './rates.ts';
+import type { CacheEntry, FailureReason, KeyValueStorage, RefreshResult } from './rates.ts';
 
-const $ = (id) => document.getElementById(id);
-const form = $('converter');
-const amountInput = $('amount');
-const amountError = $('amount-error');
-const fromSelect = $('from');
-const toSelect = $('to');
-const resultEl = $('result');
-const rateEl = $('rate');
-const statusEl = $('status');
-const statusTitle = $('status-title');
-const statusDetail = $('status-detail');
-const refreshButton = $('refresh');
+function byId<T extends HTMLElement>(id: string, type: new () => T): T {
+  const el = document.getElementById(id);
+  if (!(el instanceof type)) throw new Error(`Missing #${id}`);
+  return el;
+}
 
-// { status: 'loading' | 'current' | 'cached' | 'unavailable', entry, reason? }
-let state = { status: 'loading', entry: null };
+const form = byId('converter', HTMLFormElement);
+const amountInput = byId('amount', HTMLInputElement);
+const amountError = byId('amount-error', HTMLElement);
+const fromSelect = byId('from', HTMLSelectElement);
+const toSelect = byId('to', HTMLSelectElement);
+const resultEl = byId('result', HTMLOutputElement);
+const rateEl = byId('rate', HTMLElement);
+const statusEl = byId('status', HTMLElement);
+const statusTitle = byId('status-title', HTMLElement);
+const statusDetail = byId('status-detail', HTMLElement);
+const refreshButton = byId('refresh', HTMLButtonElement);
+
+type State = RefreshResult | { status: 'loading'; entry: null } | { status: 'cached'; entry: CacheEntry; reason?: undefined };
+
+let state: State = { status: 'loading', entry: null };
 let refreshing = false;
 
-const storage = (() => {
+const storage: KeyValueStorage = (() => {
   try { return window.localStorage; } catch { return null; }
 })() || { getItem: () => null, setItem: () => { throw new Error('no storage'); } };
 
-const formatMoney = (value, currency) =>
+const formatMoney = (value: number, currency: string) =>
   new Intl.NumberFormat(undefined, {
     style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2,
   }).format(value);
 
-const formatRate = (value) =>
-  new Intl.NumberFormat(undefined, { maximumSignificantDigits: 6 }).format(value);
+const formatRate = (value: number | null) =>
+  value === null ? '—' : new Intl.NumberFormat(undefined, { maximumSignificantDigits: 6 }).format(value);
 
-const formatDateTime = (iso) =>
+const formatDateTime = (iso: string) =>
   new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
 
-const formatRateDate = (yyyyMmDd) =>
+const formatRateDate = (yyyyMmDd: string) =>
   new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' })
     .format(new Date(`${yyyyMmDd}T00:00:00Z`));
 
-function failureText(reason) {
+function failureText(reason: FailureReason | undefined): string {
   if (!navigator.onLine) return 'You are offline.';
   switch (reason) {
     case 'timeout': return 'The rate server took too long to respond.';
@@ -70,7 +78,7 @@ function renderResult() {
 }
 
 function renderStatus() {
-  const { status, entry, reason } = state;
+  const { status, entry } = state;
   statusEl.dataset.state = status;
   refreshButton.disabled = refreshing;
   refreshButton.textContent = refreshing ? 'Refreshing…' : 'Refresh rates';
@@ -80,19 +88,19 @@ function renderStatus() {
       `ECB reference rate of ${formatRateDate(entry.rateDate)}.`
     : '';
 
-  switch (status) {
+  switch (state.status) {
     case 'current':
       statusTitle.textContent = 'Current rates';
       statusDetail.textContent = updated;
       break;
     case 'cached':
       statusTitle.textContent = refreshing ? 'Cached rates – checking for updates…' : 'Cached rates';
-      statusDetail.textContent = (reason ? `${failureText(reason)} ` : '') + updated;
+      statusDetail.textContent = (state.reason ? `${failureText(state.reason)} ` : '') + updated;
       break;
     case 'unavailable':
       statusTitle.textContent = 'Rates unavailable';
       statusDetail.textContent =
-        `${failureText(reason)} Connect to the internet once and press “Refresh rates”.`;
+        `${failureText(state.reason)} Connect to the internet once and press “Refresh rates”.`;
       break;
     default:
       statusTitle.textContent = 'Loading rates…';
@@ -131,9 +139,10 @@ if (cached) state = { status: 'cached', entry: cached };
 render();
 refresh();
 
-if ('serviceWorker' in navigator) {
+// The service worker only exists in production builds; in dev it would fight Vite's HMR.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch((err) => {
+    navigator.serviceWorker.register('./sw.js').catch((err: unknown) => {
       console.warn('Service worker registration failed:', err);
     });
   });

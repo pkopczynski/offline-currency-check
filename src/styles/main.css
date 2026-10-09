@@ -1,0 +1,203 @@
+@import './tokens.css';
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  font-family: var(--font-sans);
+  line-height: var(--leading);
+  color: var(--color-text);
+  background:
+    radial-gradient(circle at 15% 0%, var(--color-bg-glow-1), transparent 55%),
+    radial-gradient(circle at 100% 100%, var(--color-bg-glow-2), transparent 50%),
+    var(--color-bg);
+  background-attachment: fixed;
+}
+
+main {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  /* Keep clear of notches and the gesture bar in the installed (standalone) app. */
+  padding:
+    max(var(--space-5), env(safe-area-inset-top))
+    max(var(--space-4), env(safe-area-inset-right))
+    max(var(--space-6), env(safe-area-inset-bottom))
+    max(var(--space-4), env(safe-area-inset-left));
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* Header */
+
+.app-header h1 {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.01em;
+}
+
+.app-header p {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* Glass surface */
+
+.glass {
+  background: var(--color-surface);
+  border: 1px solid var(--color-surface-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-glass);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+.converter {
+  padding: var(--space-5) var(--space-4);
+  display: grid;
+  gap: var(--space-4);
+}
+
+.converter-form { display: grid; gap: var(--space-4); }
+
+/* Form fields */
+
+.field { display: grid; gap: var(--space-1); }
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-4) var(--space-3);
+}
+
+label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+}
+
+input, select, button { font: inherit; color: inherit; }
+
+input, select {
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-field-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-field);
+  color: var(--color-text);
+  transition: border-color var(--duration-fast) var(--ease);
+}
+
+/* Large amount input; at least 16px everywhere so iOS does not zoom on focus. */
+input {
+  font-size: var(--text-lg);
+  font-variant-numeric: tabular-nums;
+}
+
+select {
+  font-size: var(--text-md);
+  appearance: none;
+  padding-right: calc(var(--space-3) * 2 + 1rem);
+  /* Chevron; stroke matches --color-text-muted. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23b4b8d9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+  background-size: 1rem;
+}
+
+/* Native option popups (desktop) do not inherit the translucent field background. */
+option { background-color: var(--color-popup); color: var(--color-text); }
+
+input:hover, select:hover { border-color: var(--color-accent); }
+
+:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+input[aria-invalid="true"] { border-color: var(--color-error); }
+
+.error {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-error);
+}
+
+/* Result */
+
+.result {
+  margin: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+  border: 1px solid var(--color-surface-border);
+  text-align: center;
+}
+
+#result {
+  display: block;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.rate {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* Status */
+
+.status {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+}
+
+.status p { margin: 0; }
+.status-title { font-weight: var(--weight-bold); }
+.status .status-detail { margin-top: var(--space-1); font-size: var(--text-sm); color: var(--color-text-muted); }
+
+.status[data-state="current"]     { color: var(--color-ok);    background-color: var(--color-ok-surface);    border-color: var(--color-ok-border); }
+.status[data-state="cached"]      { color: var(--color-warn);  background-color: var(--color-warn-surface);  border-color: var(--color-warn-border); }
+.status[data-state="unavailable"] { color: var(--color-error); background-color: var(--color-error-surface); border-color: var(--color-error-border); }
+.status[data-state="loading"]     { color: var(--color-text-muted); }
+
+/* Button */
+
+button {
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end));
+  color: var(--color-on-primary);
+  font-weight: var(--weight-bold);
+  box-shadow: var(--shadow-primary);
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease), filter var(--duration-fast) var(--ease);
+}
+
+button:hover { filter: brightness(1.1); }
+button:active { transform: scale(0.98); }
+button:disabled { opacity: 0.7; cursor: progress; filter: none; transform: none; }
+
+/* Footer */
+
+.source {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.source a { color: var(--color-accent); text-underline-offset: 2px; }

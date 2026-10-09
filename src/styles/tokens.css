@@ -1,0 +1,118 @@
+/*
+ * Design tokens. Primitives are raw values; components use only the semantic
+ * tokens below them, so the theme can change in one place.
+ */
+:root {
+  /* Primitive palette */
+  --navy-950: #060918;
+  --navy-900: #0b1030;
+  --navy-800: #151b4a;
+  --violet-600: #7c3aed;
+  --violet-300: #c4b5fd;
+  --indigo-600: #4f46e5;
+  --blue-500: #3b82f6;
+  --green-300: #86efac;
+  --green-500: #22c55e;
+  --amber-300: #fcd34d;
+  --amber-500: #f59e0b;
+  --red-300: #fca5a5;
+  --red-500: #ef4444;
+  --white: #ffffff;
+
+  /* Color */
+  --color-bg: var(--navy-950);
+  --color-bg-glow-1: color-mix(in srgb, var(--violet-600) 35%, transparent);
+  --color-bg-glow-2: color-mix(in srgb, var(--blue-500) 22%, transparent);
+  --color-text: #eef0ff;
+  --color-text-muted: #b4b8d9;
+  --color-accent: var(--violet-300);
+  --color-focus: var(--violet-300);
+
+  --color-surface: rgb(255 255 255 / 0.07);
+  --color-surface-border: rgb(255 255 255 / 0.14);
+  --color-surface-highlight: rgb(255 255 255 / 0.12);
+  --color-field: rgb(6 9 24 / 0.55);
+  --color-field-border: rgb(255 255 255 / 0.18);
+  --color-popup: var(--navy-900);
+
+  --color-primary-start: var(--violet-600);
+  --color-primary-end: var(--indigo-600);
+  --color-on-primary: var(--white);
+
+  --color-ok: var(--green-300);
+  --color-ok-surface: color-mix(in srgb, var(--green-500) 12%, transparent);
+  --color-ok-border: color-mix(in srgb, var(--green-300) 35%, transparent);
+  --color-warn: var(--amber-300);
+  --color-warn-surface: color-mix(in srgb, var(--amber-500) 12%, transparent);
+  --color-warn-border: color-mix(in srgb, var(--amber-300) 35%, transparent);
+  --color-error: var(--red-300);
+  --color-error-surface: color-mix(in srgb, var(--red-500) 12%, transparent);
+  --color-error-border: color-mix(in srgb, var(--red-300) 35%, transparent);
+
+  /* Glass */
+  --glass-blur: 18px;
+  --glass-saturate: 140%;
+
+  /* Spacing (0.25rem steps) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  /* Radii */
+  --radius-sm: 0.75rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.5rem;
+
+  /* Typography */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --text-xs: 0.8125rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.375rem;
+  --text-xl: clamp(1.75rem, 9vw, 2.5rem);
+  --weight-medium: 500;
+  --weight-bold: 650;
+  --leading: 1.45;
+
+  /* Elevation */
+  --shadow-glass: 0 12px 40px rgb(0 0 0 / 0.35), inset 0 1px 0 var(--color-surface-highlight);
+  --shadow-primary: 0 8px 24px color-mix(in srgb, var(--violet-600) 35%, transparent);
+
+  /* Sizing */
+  --tap-target: 3rem;
+  --content-width: 30rem;
+
+  /* Motion */
+  --duration-fast: 150ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+
+  color-scheme: dark;
+}
+
+/* Browsers without backdrop-filter get a more opaque surface to keep text legible. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --color-surface: rgb(21 27 74 / 0.92);
+  }
+}
+
+/* Users who ask for less transparency or more contrast get solid surfaces and stronger borders. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :root {
+    --color-surface: var(--navy-800);
+    --color-surface-border: rgb(255 255 255 / 0.4);
+    --color-field: var(--navy-900);
+    --color-field-border: rgb(255 255 255 / 0.5);
+    --color-text-muted: #d4d7f0;
+    --glass-blur: 0px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+  }
+}
