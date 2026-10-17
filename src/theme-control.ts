@@ -5,7 +5,7 @@ import { startAmbientLight } from './ambient-light.ts';
 import type { AmbientLightHandle } from './ambient-light.ts';
 import type { KeyValueStorage } from './rates.ts';
 import {
-  DEFAULT_AUTO_CONFIG, THEME_MODES, isThemeMode, loadPrefs, nextClockChange, pickVariant, resolveAuto, savePrefs,
+  DEFAULT_AUTO_CONFIG, THEME_MODES, cssTimeToMs, isThemeMode, loadPrefs, nextClockChange, pickVariant, resolveAuto, savePrefs,
 } from './theme.ts';
 import type { Theme, ThemeMode, ThemeSource } from './theme.ts';
 
@@ -34,7 +34,6 @@ export function initTheme(storage: KeyValueStorage) {
   const menu = byId('theme-menu', HTMLElement);
   const toggle = byId('theme-toggle', HTMLButtonElement);
   const popup = byId('theme-popup', HTMLElement);
-  const hint = byId('theme-hint', HTMLElement);
   const modes = popup.querySelector<HTMLElement>('.theme-modes');
   const radios = [...popup.querySelectorAll<HTMLInputElement>('input[name="theme-mode"]')];
   if (!modes || radios.length !== THEME_MODES.length) throw new Error('Theme popup markup is incomplete');
@@ -57,7 +56,7 @@ export function initTheme(storage: KeyValueStorage) {
   // --- Applying a theme -----------------------------------------------------------------
 
   const cssVar = (name: string) => getComputedStyle(root).getPropertyValue(name).trim();
-  const cssMs = (name: string) => parseFloat(cssVar(name)) || 0;
+  const cssMs = (name: string) => cssTimeToMs(cssVar(name));
 
   function applyToDom() {
     root.dataset.theme = theme;
@@ -125,14 +124,6 @@ export function initTheme(storage: KeyValueStorage) {
     });
   }
 
-  function hintText(): string {
-    if (prefs.mode === 'dark') return 'Always dark.';
-    if (prefs.mode === 'light') return 'Always light.';
-    return source === 'sensor'
-      ? `Following your device’s light sensor. Now ${theme}.`
-      : `Following the time of day: light ${pad(AUTO.dayStartHour)}–${pad(AUTO.dayEndHour)}. Now ${theme}.`;
-  }
-
   // Everything that reflects mode / source / theme but is not part of the page's colors.
   function renderControls() {
     const index = THEME_MODES.indexOf(prefs.mode);
@@ -141,7 +132,6 @@ export function initTheme(storage: KeyValueStorage) {
     root.dataset.themeMode = prefs.mode;
     toggle.setAttribute('aria-label',
       `Theme: ${MODE_LABEL[prefs.mode]}${prefs.mode === 'auto' ? `, currently ${theme}` : ''}`);
-    hint.textContent = hintText();
   }
 
   // The effective theme changed: pick a fresh palette variant (never the previous one for
