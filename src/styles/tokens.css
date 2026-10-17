@@ -1,7 +1,20 @@
 /*
  * Design tokens. Primitives are raw values; components use only the semantic
  * tokens below them, so the theme can change in one place.
+ *
+ * Themes: :root holds the dark theme (also the no-JavaScript default);
+ * :root[data-theme="light"] overrides the semantic tokens. Each theme has four curated
+ * palette variants, selected by data-variant. A variant only changes the --v-* tokens
+ * (background glows, glass tint, accent, primary gradient); text and status colors are
+ * fixed per theme. tests/theme-palette.test.ts checks WCAG AA contrast for every
+ * theme x variant combination, so keep the values in plain hex.
  */
+
+/* Registered so the page background fades between themes instead of switching abruptly. */
+@property --color-bg { syntax: "<color>"; inherits: true; initial-value: #060918; }
+@property --color-bg-glow-1 { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --color-bg-glow-2 { syntax: "<color>"; inherits: true; initial-value: transparent; }
+
 :root {
   /* Primitive palette */
   --navy-950: #060918;
@@ -19,24 +32,32 @@
   --red-500: #ef4444;
   --white: #ffffff;
 
-  /* Color */
+  /* Dark theme (default) */
+  --v-glow-1: var(--violet-600);
+  --v-glow-2: var(--blue-500);
+  --v-tint: #ffffff;
+  --v-accent: var(--violet-300);
+  --v-primary-start: var(--violet-600);
+  --v-primary-end: var(--indigo-600);
+
   --color-bg: var(--navy-950);
-  --color-bg-glow-1: color-mix(in srgb, var(--violet-600) 35%, transparent);
-  --color-bg-glow-2: color-mix(in srgb, var(--blue-500) 22%, transparent);
+  --color-bg-glow-1: color-mix(in srgb, var(--v-glow-1) 35%, transparent);
+  --color-bg-glow-2: color-mix(in srgb, var(--v-glow-2) 22%, transparent);
   --color-text: #eef0ff;
   --color-text-muted: #b4b8d9;
-  --color-accent: var(--violet-300);
-  --color-focus: var(--violet-300);
+  --color-accent: var(--v-accent);
+  --color-focus: var(--v-accent);
 
-  --color-surface: rgb(255 255 255 / 0.07);
+  --color-surface: color-mix(in srgb, var(--v-tint) 7%, transparent);
   --color-surface-border: rgb(255 255 255 / 0.14);
   --color-surface-highlight: rgb(255 255 255 / 0.12);
   --color-field: rgb(6 9 24 / 0.55);
   --color-field-border: rgb(255 255 255 / 0.18);
   --color-popup: var(--navy-900);
+  --color-popup-surface: color-mix(in srgb, var(--navy-800) 82%, transparent);
 
-  --color-primary-start: var(--violet-600);
-  --color-primary-end: var(--indigo-600);
+  --color-primary-start: var(--v-primary-start);
+  --color-primary-end: var(--v-primary-end);
   --color-on-primary: var(--white);
 
   --color-ok: var(--green-300);
@@ -48,6 +69,9 @@
   --color-error: var(--red-300);
   --color-error-surface: color-mix(in srgb, var(--red-500) 12%, transparent);
   --color-error-border: color-mix(in srgb, var(--red-300) 35%, transparent);
+
+  /* Chevron in <select>; stroke matches --color-text-muted. */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23b4b8d9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
 
   /* Glass */
   --glass-blur: 18px;
@@ -79,7 +103,8 @@
 
   /* Elevation */
   --shadow-glass: 0 12px 40px rgb(0 0 0 / 0.35), inset 0 1px 0 var(--color-surface-highlight);
-  --shadow-primary: 0 8px 24px color-mix(in srgb, var(--violet-600) 35%, transparent);
+  --shadow-popup: 0 18px 48px rgb(0 0 0 / 0.5), 0 2px 8px rgb(0 0 0 / 0.3), inset 0 1px 0 var(--color-surface-highlight);
+  --shadow-primary: 0 8px 24px color-mix(in srgb, var(--v-primary-start) 35%, transparent);
 
   /* Sizing */
   --tap-target: 3rem;
@@ -87,15 +112,101 @@
 
   /* Motion */
   --duration-fast: 150ms;
+  --duration-base: 260ms;
+  --duration-slow: 600ms; /* theme change: radial reveal / color fade */
   --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  /* Theme reveal: a gentle start instead of --ease's jump, which covered most of the screen
+     in the first third. */
+  --ease-reveal: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.3, 1.45, 0.5, 1);
+  /* Color transitions while the theme changes; "0s" outside of a change. Every transition
+     list that animates colors appends var(--theme-fade). */
+  --theme-fade: background-color 0s, color 0s, border-color 0s, box-shadow 0s;
 
   color-scheme: dark;
+}
+
+/* Light theme */
+:root[data-theme="light"] {
+  --v-glow-1: #a78bfa;
+  --v-glow-2: #93c5fd;
+  --v-tint: #ffffff;
+  --v-accent: #5b21b6;
+  --v-primary-start: #6d28d9;
+  --v-primary-end: #4338ca;
+
+  --color-bg: #eef0fb;
+  --color-bg-glow-1: color-mix(in srgb, var(--v-glow-1) 50%, transparent);
+  --color-bg-glow-2: color-mix(in srgb, var(--v-glow-2) 40%, transparent);
+  --color-text: #141836;
+  --color-text-muted: #444b73;
+
+  --color-surface: color-mix(in srgb, var(--v-tint) 58%, transparent);
+  --color-surface-border: rgb(255 255 255 / 0.8);
+  --color-surface-highlight: rgb(255 255 255 / 0.9);
+  --color-field: rgb(255 255 255 / 0.7);
+  --color-field-border: rgb(20 24 54 / 0.5);
+  --color-popup: #ffffff;
+  --color-popup-surface: color-mix(in srgb, var(--v-tint) 84%, transparent);
+
+  --color-ok: #14532d;
+  --color-ok-surface: color-mix(in srgb, #16a34a 14%, transparent);
+  --color-ok-border: color-mix(in srgb, #15803d 45%, transparent);
+  --color-warn: #78350f;
+  --color-warn-surface: color-mix(in srgb, #f59e0b 16%, transparent);
+  --color-warn-border: color-mix(in srgb, #b45309 45%, transparent);
+  --color-error: #991b1b;
+  --color-error-surface: color-mix(in srgb, #ef4444 12%, transparent);
+  --color-error-border: color-mix(in srgb, #b91c1c 45%, transparent);
+
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23444b73' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+
+  --glass-blur: 20px;
+  --shadow-glass: 0 12px 36px rgb(46 56 130 / 0.16), inset 0 1px 0 var(--color-surface-highlight);
+  --shadow-popup: 0 18px 44px rgb(46 56 130 / 0.26), 0 2px 8px rgb(46 56 130 / 0.12), inset 0 1px 0 var(--color-surface-highlight);
+
+  color-scheme: light;
+}
+
+/*
+ * Palette variants: analogous or complementary neighbours of each theme's base hue.
+ * Variant 0 of each theme is the base palette above.
+ */
+:root[data-theme="dark"][data-variant="1"] { /* indigo + sky */
+  --v-glow-1: #4f46e5; --v-glow-2: #0ea5e9; --v-tint: #e0e7ff;
+  --v-accent: #a5b4fc; --v-primary-start: #4f46e5; --v-primary-end: #2563eb;
+}
+:root[data-theme="dark"][data-variant="2"] { /* orchid + indigo */
+  --v-glow-1: #c026d3; --v-glow-2: #6366f1; --v-tint: #fae8ff;
+  --v-accent: #f0abfc; --v-primary-start: #a21caf; --v-primary-end: #7c3aed;
+}
+:root[data-theme="dark"][data-variant="3"] { /* teal + indigo */
+  --v-glow-1: #0f766e; --v-glow-2: #4f46e5; --v-tint: #ccfbf1;
+  --v-accent: #5eead4; --v-primary-start: #0f766e; --v-primary-end: #4f46e5;
+}
+
+:root[data-theme="light"][data-variant="1"] { /* sky + periwinkle */
+  --v-glow-1: #7dd3fc; --v-glow-2: #a5b4fc; --v-tint: #f0f7ff;
+  --v-accent: #1e40af; --v-primary-start: #2563eb; --v-primary-end: #4338ca;
+}
+:root[data-theme="light"][data-variant="2"] { /* rose + lavender */
+  --v-glow-1: #f9a8d4; --v-glow-2: #c4b5fd; --v-tint: #fff5fb;
+  --v-accent: #86198f; --v-primary-start: #a21caf; --v-primary-end: #6d28d9;
+}
+:root[data-theme="light"][data-variant="3"] { /* mint + sky */
+  --v-glow-1: #5eead4; --v-glow-2: #93c5fd; --v-tint: #f0fffb;
+  --v-accent: #115e59; --v-primary-start: #0f766e; --v-primary-end: #1d4ed8;
 }
 
 /* Browsers without backdrop-filter get a more opaque surface to keep text legible. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   :root {
     --color-surface: rgb(21 27 74 / 0.92);
+    --color-popup-surface: rgb(21 27 74 / 0.96);
+  }
+  :root[data-theme="light"] {
+    --color-surface: rgb(255 255 255 / 0.9);
+    --color-popup-surface: rgb(255 255 255 / 0.96);
   }
 }
 
@@ -103,10 +214,20 @@
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   :root {
     --color-surface: var(--navy-800);
+    --color-popup-surface: var(--navy-800);
     --color-surface-border: rgb(255 255 255 / 0.4);
     --color-field: var(--navy-900);
     --color-field-border: rgb(255 255 255 / 0.5);
     --color-text-muted: #d4d7f0;
+    --glass-blur: 0px;
+  }
+  :root[data-theme="light"] {
+    --color-surface: #ffffff;
+    --color-popup-surface: #ffffff;
+    --color-surface-border: rgb(20 24 54 / 0.4);
+    --color-field: #ffffff;
+    --color-field-border: rgb(20 24 54 / 0.7);
+    --color-text-muted: #343a60;
     --glass-blur: 0px;
   }
 }
@@ -114,5 +235,7 @@
 @media (prefers-reduced-motion: reduce) {
   :root {
     --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
   }
 }

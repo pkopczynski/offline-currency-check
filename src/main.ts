@@ -3,6 +3,7 @@ import {
   loadCache, refreshRates, convert, parseAmount, formatAge,
 } from './rates.ts';
 import type { CacheEntry, FailureReason, KeyValueStorage, RefreshResult } from './rates.ts';
+import { initTheme } from './theme-control.ts';
 
 function byId<T extends HTMLElement>(id: string, type: new () => T): T {
   const el = document.getElementById(id);
@@ -30,6 +31,9 @@ let refreshing = false;
 const storage: KeyValueStorage = (() => {
   try { return window.localStorage; } catch { return null; }
 })() || { getItem: () => null, setItem: () => { throw new Error('no storage'); } };
+
+// Theming is optional: if it fails to start, the converter must still work.
+try { initTheme(storage); } catch (err) { console.warn('Theme setup failed:', err); }
 
 const formatMoney = (value: number, currency: string) =>
   new Intl.NumberFormat(undefined, {

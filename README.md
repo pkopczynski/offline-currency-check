@@ -10,6 +10,9 @@ A small offline-first currency converter for **EUR**, **PLN** and **TRY**.
 - After one successful online visit, the app works fully offline (service worker) and can
   be installed as a standalone app on Android and other platforms.
 
+- Light, dark and automatic theme, chosen from the icon in the top-right corner
+  (see [Theme](#theme)).
+
 TypeScript, built with [Vite](https://vite.dev/). No framework and no runtime dependencies.
 
 ## Requirements
@@ -42,14 +45,52 @@ npm run build && npx vite preview --base /offline-currency-check/
 index.html               page markup (Vite entry)
 src/main.ts              UI: DOM wiring and rendering
 src/rates.ts             exchange-rate logic (no DOM; unit tested)
+src/theme.ts             theme decisions: clock schedule, light thresholds, variants, prefs (no DOM; unit tested)
+src/theme-control.ts     theme popup, applying themes, Auto-mode inputs and transitions
+src/ambient-light.ts     AmbientLightSensor wrapper
+src/glass-audio.ts       synthesized glass-tap sounds (Web Audio)
 src/sw.ts                service worker, built to dist/sw.js
-src/styles/tokens.css    design tokens (palette, spacing, radii, type, glass, motion)
+src/styles/tokens.css    design tokens (palette, light/dark themes and variants, spacing, radii, type, glass, motion)
 src/styles/main.css      layout and components, using only semantic tokens
 public/                  copied as-is: web app manifest and icons
 scripts/check-dist.ts    post-build checks (precache list, relative URLs, manifest icons)
 scripts/generate-icons.ts  renders public/icons/* (npm run icons)
 tests/                   unit tests
 ```
+
+## Theme
+
+The icon in the top-right corner opens a popup with **Dark**, **Light** and **Auto**. The
+choice and the current palette variant are stored in `localStorage` (`theme-prefs-v1`).
+A small script in `index.html` applies the stored theme before the first paint.
+
+**Auto** decides in this order:
+
+1. **Ambient light sensor**, if the browser really has one. This is the Generic Sensor
+   API's `AmbientLightSensor`: Chromium only (mainly Android Chrome), a secure context, and
+   currently behind the `#enable-generic-sensor-extra-classes` flag, so most devices do not
+   have it. Firefox and Safari do not implement it. At or below 20 lux the theme is dark, at
+   or above 80 lux light, in between it stays as it is, and a change must hold for 2 s.
+   The sensor only runs in Auto mode while the page is visible.
+2. **Local time**: light from 07:00 to 19:00 in the device's time zone, dark otherwise. Used
+   whenever the sensor is unsupported, denied, failing or silent, and it needs no permission.
+
+All thresholds and hours are in `DEFAULT_AUTO_CONFIG` (`src/theme.ts`); the pre-paint script in
+`index.html` repeats the hours, and `tests/theme.test.ts` fails if the two disagree. The theme
+is re-evaluated on sensor readings, when the page becomes visible again, and at 07:00 / 19:00.
+There is no location or sunrise/sunset data in the app, so none is used.
+
+Each theme has four palette variants (`data-variant` blocks in `tokens.css`) that only change
+the background glows, glass tint, accent and primary gradient. A new variant is chosen when the
+effective theme changes, never the same one twice in a row for a theme, and is remembered per
+theme. `tests/theme-palette.test.ts` checks WCAG AA contrast for every theme and variant.
+
+Theme changes use a View Transition (a circle growing from the icon; a crossfade for automatic
+changes) where supported, otherwise a CSS color fade; with reduced motion they are instant.
+The popup and the tap sounds (short synthesized fingernail-on-glass taps: six voices that differ
+in pitch, decay and click, picked at random and never the same one twice in a row) are created
+on first use after a user gesture. The icon looks pressed in while the popup is open. There
+is no sound setting.
 
 ## Service worker and updates
 
@@ -87,3 +128,6 @@ Actions**. The app is then served at `https://<user>.github.io/<repo>/`.
 6. On Android: the launcher icon fills its mask shape, the splash screen and status bar are
    dark navy, and the app opens without browser UI.
 7. After deploying a change: open the app, close it, reopen → the change is visible.
+8. Theme: Dark and Light override the clock; Auto follows the clock (change the device time to
+   check); the choice survives a reload; Escape and tapping outside close the popup; with
+   reduced motion enabled the theme changes instantly.
