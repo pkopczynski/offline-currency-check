@@ -431,15 +431,6 @@ input[aria-invalid="true"] { border-color: var(--color-error); }
   outline-offset: 1px;
 }
 
-.theme-hint {
-  /* Two lines reserved, so the popup does not change height between modes. */
-  min-height: 2.8em;
-  margin: var(--space-3) var(--space-1) 0;
-  font-size: var(--text-xs);
-  line-height: 1.4;
-  color: var(--color-text-muted);
-}
-
 /* View Transitions: a circle grows from the theme button (set in theme-control.ts).
    Automatic changes keep the browser's default crossfade. */
 ::view-transition-group(root) { animation-duration: var(--duration-slow); }
