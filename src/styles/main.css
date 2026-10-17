@@ -4,6 +4,23 @@
 
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
+/* Theme change fallback (browsers without View Transitions): while html.theme-fade is set,
+   colors, borders and shadows fade over --duration-slow. Components with their own
+   transitions append var(--theme-fade) to them. */
+:where(*) { transition: var(--theme-fade); }
+
+html.theme-fade {
+  --theme-fade:
+    background-color var(--duration-slow) var(--ease),
+    color var(--duration-slow) var(--ease),
+    border-color var(--duration-slow) var(--ease),
+    box-shadow var(--duration-slow) var(--ease);
+  transition:
+    --color-bg var(--duration-slow) var(--ease),
+    --color-bg-glow-1 var(--duration-slow) var(--ease),
+    --color-bg-glow-2 var(--duration-slow) var(--ease);
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -33,14 +50,26 @@ main {
 
 /* Header */
 
-.app-header h1 {
+.app-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  /* Above the cards, so the theme popup overlaps them. */
+  position: relative;
+  z-index: 10;
+}
+
+.app-title { min-width: 0; }
+
+.app-title h1 {
   margin: 0;
   font-size: var(--text-lg);
   font-weight: var(--weight-bold);
   letter-spacing: -0.01em;
 }
 
-.app-header p {
+.app-title p {
   margin: var(--space-1) 0 0;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
@@ -91,7 +120,7 @@ input, select {
   border-radius: var(--radius-sm);
   background-color: var(--color-field);
   color: var(--color-text);
-  transition: border-color var(--duration-fast) var(--ease);
+  transition: border-color var(--duration-fast) var(--ease), var(--theme-fade);
 }
 
 /* Large amount input; at least 16px everywhere so iOS does not zoom on focus. */
@@ -104,8 +133,7 @@ select {
   font-size: var(--text-md);
   appearance: none;
   padding-right: calc(var(--space-3) * 2 + 1rem);
-  /* Chevron; stroke matches --color-text-muted. */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23b4b8d9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  background-image: var(--select-chevron);
   background-repeat: no-repeat;
   background-position: right var(--space-3) center;
   background-size: 1rem;
@@ -171,9 +199,9 @@ input[aria-invalid="true"] { border-color: var(--color-error); }
 .status[data-state="unavailable"] { color: var(--color-error); background-color: var(--color-error-surface); border-color: var(--color-error-border); }
 .status[data-state="loading"]     { color: var(--color-text-muted); }
 
-/* Button */
+/* Primary button */
 
-button {
+.btn-primary {
   width: 100%;
   min-height: var(--tap-target);
   padding: var(--space-3) var(--space-4);
@@ -184,12 +212,12 @@ button {
   font-weight: var(--weight-bold);
   box-shadow: var(--shadow-primary);
   cursor: pointer;
-  transition: transform var(--duration-fast) var(--ease), filter var(--duration-fast) var(--ease);
+  transition: transform var(--duration-fast) var(--ease), filter var(--duration-fast) var(--ease), var(--theme-fade);
 }
 
-button:hover { filter: brightness(1.1); }
-button:active { transform: scale(0.98); }
-button:disabled { opacity: 0.7; cursor: progress; filter: none; transform: none; }
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-primary:active { transform: scale(0.98); }
+.btn-primary:disabled { opacity: 0.7; cursor: progress; filter: none; transform: none; }
 
 /* Footer */
 
@@ -201,3 +229,225 @@ button:disabled { opacity: 0.7; cursor: progress; filter: none; transform: none;
 }
 
 .source a { color: var(--color-accent); text-underline-offset: 2px; }
+
+
+/* Theme control */
+
+.theme-menu { position: relative; flex: none; }
+
+.theme-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.theme-toggle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  padding: 0;
+  border: 1px solid var(--color-surface-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-accent);
+  box-shadow: var(--shadow-glass);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  cursor: pointer;
+  /* Release springs back past 1; the pressed state below is quicker. */
+  transition: transform var(--duration-base) var(--ease-spring), border-color var(--duration-fast) var(--ease), var(--theme-fade);
+}
+
+.theme-toggle:hover { border-color: var(--color-accent); }
+
+/* Pressed-in glass once the button has been used (data-used is set by the script): a dimmed
+   accent tint with an inset shadow, drawn on a layer behind the icons. The accent follows the
+   current theme and palette variant, so it stays coherent with the selected mode. The icon keeps
+   full contrast, so it never looks disabled; it sinks a little deeper while the popup is open. */
+.theme-toggle::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  box-shadow:
+    inset 0 2px 7px color-mix(in srgb, var(--color-text) 30%, transparent),
+    inset 0 -1px 0 var(--color-surface-highlight);
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease), var(--theme-fade);
+}
+.theme-toggle[data-used="true"] {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  transform: scale(0.96);
+}
+.theme-toggle[data-used="true"]::after { opacity: 0.75; }
+.theme-toggle[aria-expanded="true"]::after { opacity: 1; }
+.theme-toggle[data-used="true"]:hover { border-color: var(--color-accent); }
+
+.theme-toggle:active {
+  transform: scale(0.88);
+  transition: transform var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease), var(--theme-fade);
+}
+
+/* Sun and moon share one spot and swap with a turn; the visible one follows the effective theme. */
+.theme-toggle .theme-icon {
+  grid-area: 1 / 1;
+  transition: transform var(--duration-base) var(--ease-spring), opacity var(--duration-base) var(--ease);
+}
+
+.theme-icon-moon { fill: color-mix(in srgb, currentColor 20%, transparent); }
+.theme-icon-sun { opacity: 0; transform: rotate(-90deg) scale(0.4); }
+:root[data-theme="light"] .theme-icon-sun { opacity: 1; transform: none; }
+:root[data-theme="light"] .theme-icon-moon { opacity: 0; transform: rotate(90deg) scale(0.4); }
+
+/* Small half-filled dot: shown while the mode is Auto. */
+.theme-toggle-auto {
+  position: absolute;
+  right: 0.45rem;
+  bottom: 0.45rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  background: linear-gradient(90deg, currentColor 50%, transparent 50%);
+  transform: scale(0);
+  transition: transform var(--duration-base) var(--ease-spring);
+}
+:root[data-theme-mode="auto"] .theme-toggle-auto { transform: scale(1); }
+
+.theme-popup {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  /* Never wider than the space between the page paddings, so it cannot clip on small screens. */
+  width: min(17rem, calc(100vw - 2 * var(--space-4) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  padding: var(--space-3);
+  border: 1px solid var(--color-surface-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-popup-surface);
+  box-shadow: var(--shadow-popup);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  transform-origin: calc(100% - 1.5rem) 0;
+  /* Closed: invisible and out of the tab order and accessibility tree (visibility), but
+     still animatable, and interruptible mid-way in both directions. */
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-0.5rem) scale(0.92);
+  pointer-events: none;
+  transition:
+    opacity var(--duration-base) var(--ease),
+    transform var(--duration-base) var(--ease),
+    visibility 0s linear var(--duration-base),
+    var(--theme-fade);
+}
+
+.theme-popup[data-open="true"] {
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition:
+    opacity var(--duration-base) var(--ease),
+    transform var(--duration-base) var(--ease-spring),
+    visibility 0s,
+    var(--theme-fade);
+}
+
+.theme-modes {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: var(--space-1);
+  border: 1px solid var(--color-surface-border);
+  border-radius: var(--radius-md);
+  background: var(--color-field);
+}
+
+/* Slides behind the selected option; --theme-index is set from the script. */
+.theme-indicator {
+  position: absolute;
+  top: var(--space-1);
+  bottom: var(--space-1);
+  left: var(--space-1);
+  width: calc((100% - 2 * var(--space-1)) / 3);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end));
+  box-shadow: var(--shadow-primary);
+  transform: translateX(calc(var(--theme-index, 0) * 100%));
+  transition: transform var(--duration-base) var(--ease-spring), var(--theme-fade);
+}
+
+/* Native radios (arrow keys, grouping, screen readers) stretched invisibly over each option. */
+.theme-option {
+  position: relative;
+  display: block;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+}
+
+.theme-option input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+  outline: none;
+}
+
+.theme-option-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: var(--tap-target);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  transition: color var(--duration-base) var(--ease), background-color var(--duration-fast) var(--ease);
+}
+
+.theme-option .theme-icon { transition: transform var(--duration-base) var(--ease-spring); }
+
+.theme-option input:hover:not(:checked) + .theme-option-face {
+  background-color: color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+
+.theme-option input:checked + .theme-option-face { color: var(--color-on-primary); }
+.theme-option input:checked + .theme-option-face .theme-icon { transform: scale(1.12); }
+
+.theme-option input:focus-visible + .theme-option-face {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.theme-hint {
+  /* Two lines reserved, so the popup does not change height between modes. */
+  min-height: 2.8em;
+  margin: var(--space-3) var(--space-1) 0;
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+/* View Transitions: a circle grows from the theme button (set in theme-control.ts).
+   Automatic changes keep the browser's default crossfade. */
+::view-transition-group(root) { animation-duration: var(--duration-slow); }
+
+:root.theme-reveal::view-transition-old(root),
+:root.theme-reveal::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}

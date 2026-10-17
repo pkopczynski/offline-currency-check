@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#0b1030">
   <meta name="description" content="Offline-first currency converter for EUR, PLN and TRY.">
   <title>Currency Converter</title>
@@ -11,13 +11,71 @@
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <!-- Sets the theme before first paint to avoid a flash of the wrong theme. Keep the schedule
+       and storage format in sync with src/theme.ts (tests/theme.test.ts checks this). -->
+  <script>
+    (function () {
+      var root = document.documentElement;
+      try {
+        var prefs = JSON.parse(localStorage.getItem('theme-prefs-v1') || 'null') || {};
+        var mode = prefs.mode === 'dark' || prefs.mode === 'light' ? prefs.mode : 'auto';
+        var hour = new Date().getHours();
+        var theme = mode === 'auto' ? (hour >= 7 && hour < 19 ? 'light' : 'dark') : mode;
+        var variant = prefs.variants && prefs.variants[theme];
+        root.dataset.theme = theme;
+        root.dataset.themeMode = mode;
+        root.dataset.variant = typeof variant === 'number' && variant >= 0 && variant < 4 && variant % 1 === 0 ? variant : 0;
+        var scheme = document.querySelector('meta[name="color-scheme"]');
+        if (scheme) scheme.content = theme;
+        var color = document.querySelector('meta[name="theme-color"]');
+        if (color) color.content = theme === 'light' ? '#eef0fb' : '#0b1030';
+      } catch (e) {
+        root.dataset.theme = 'dark';
+      }
+    })();
+  </script>
   <script type="module" src="./src/main.ts"></script>
 </head>
 <body>
   <main>
     <header class="app-header">
-      <h1>Currency Converter</h1>
-      <p>EUR · PLN · TRY – works offline</p>
+      <div class="app-title">
+        <h1>Currency Converter</h1>
+        <p>EUR · PLN · TRY – works offline</p>
+      </div>
+
+      <div class="theme-menu" id="theme-menu">
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Theme" aria-haspopup="dialog" aria-expanded="false" aria-controls="theme-popup">
+          <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg>
+          <span class="theme-toggle-auto" aria-hidden="true"></span>
+        </button>
+
+        <div id="theme-popup" class="theme-popup" role="dialog" aria-label="Theme">
+          <div class="theme-modes" role="radiogroup" aria-label="Theme mode">
+            <span class="theme-indicator" aria-hidden="true"></span>
+            <label class="theme-option" title="Dark">
+              <input type="radio" name="theme-mode" value="dark" aria-label="Dark">
+              <span class="theme-option-face">
+                <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg>
+              </span>
+            </label>
+            <label class="theme-option" title="Light">
+              <input type="radio" name="theme-mode" value="light" aria-label="Light">
+              <span class="theme-option-face">
+                <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+              </span>
+            </label>
+            <label class="theme-option" title="Auto">
+              <input type="radio" name="theme-mode" value="auto" aria-label="Auto">
+              <span class="theme-option-face">
+                <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18z" fill="currentColor"/></svg>
+              </span>
+            </label>
+          </div>
+          <p id="theme-hint" class="theme-hint"></p>
+        </div>
+      </div>
     </header>
 
     <section class="converter glass" aria-label="Converter">
@@ -59,7 +117,7 @@
       <p id="status-detail" class="status-detail"></p>
     </section>
 
-    <button id="refresh" type="button">Refresh rates</button>
+    <button id="refresh" class="btn-primary" type="button">Refresh rates</button>
 
     <p class="source">Rates: European Central Bank via <a href="https://frankfurter.dev/" rel="noopener">Frankfurter</a>. Published once per working day.</p>
   </main>
