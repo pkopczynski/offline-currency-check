@@ -5,7 +5,7 @@ import { startAmbientLight } from './ambient-light.ts';
 import type { AmbientLightHandle } from './ambient-light.ts';
 import type { KeyValueStorage } from './rates.ts';
 import {
-  DEFAULT_AUTO_CONFIG, THEME_MODES, isThemeMode, loadPrefs, nextClockChange, pickVariant, resolveAuto, savePrefs,
+  DEFAULT_AUTO_CONFIG, THEME_MODES, cssTimeToMs, isThemeMode, loadPrefs, nextClockChange, pickVariant, resolveAuto, savePrefs,
 } from './theme.ts';
 import type { Theme, ThemeMode, ThemeSource } from './theme.ts';
 
@@ -56,7 +56,7 @@ export function initTheme(storage: KeyValueStorage) {
   // --- Applying a theme -----------------------------------------------------------------
 
   const cssVar = (name: string) => getComputedStyle(root).getPropertyValue(name).trim();
-  const cssMs = (name: string) => parseFloat(cssVar(name)) || 0;
+  const cssMs = (name: string) => cssTimeToMs(cssVar(name));
 
   function applyToDom() {
     root.dataset.theme = theme;
