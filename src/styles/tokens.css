@@ -113,10 +113,10 @@
   /* Motion */
   --duration-fast: 150ms;
   --duration-base: 260ms;
-  --duration-slow: 750ms; /* theme change: radial reveal / color fade */
+  --duration-slow: 600ms; /* theme change: radial reveal / color fade */
   --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
-  /* The reveal needs a gentle start and a long soft landing: with --ease the circle covered
-     most of the screen in the first third and then crawled through the corners. */
+  /* Theme reveal: a gentle start instead of --ease's jump, which covered most of the screen
+     in the first third. */
   --ease-reveal: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-spring: cubic-bezier(0.3, 1.45, 0.5, 1);
   /* Color transitions while the theme changes; "0s" outside of a change. Every transition

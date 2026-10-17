@@ -266,10 +266,9 @@ input[aria-invalid="true"] { border-color: var(--color-error); }
 
 .theme-toggle:hover { border-color: var(--color-accent); }
 
-/* Pressed-in glass once the button has been used (data-used is set by the script): a dimmed
-   accent tint with an inset shadow, drawn on a layer behind the icons. The accent follows the
-   current theme and palette variant, so it stays coherent with the selected mode. The icon keeps
-   full contrast, so it never looks disabled; it sinks a little deeper while the popup is open. */
+/* Pressed-in glass while the popup is open (aria-expanded, so every way of closing it
+   restores the button): a dimmed accent tint with an inset shadow on a layer behind the icons.
+   The accent follows the current theme and palette variant; the icon keeps full contrast. */
 .theme-toggle::after {
   content: "";
   position: absolute;
@@ -284,13 +283,12 @@ input[aria-invalid="true"] { border-color: var(--color-error); }
   opacity: 0;
   transition: opacity var(--duration-base) var(--ease), var(--theme-fade);
 }
-.theme-toggle[data-used="true"] {
+.theme-toggle[aria-expanded="true"] {
   border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
   transform: scale(0.96);
 }
-.theme-toggle[data-used="true"]::after { opacity: 0.75; }
 .theme-toggle[aria-expanded="true"]::after { opacity: 1; }
-.theme-toggle[data-used="true"]:hover { border-color: var(--color-accent); }
+.theme-toggle[aria-expanded="true"]:hover { border-color: var(--color-accent); }
 
 .theme-toggle:active {
   transform: scale(0.88);
@@ -445,6 +443,10 @@ input[aria-invalid="true"] { border-color: var(--color-error); }
 /* View Transitions: a circle grows from the theme button (set in theme-control.ts).
    Automatic changes keep the browser's default crossfade. */
 ::view-transition-group(root) { animation-duration: var(--duration-slow); }
+
+/* The transition overlay covers the page and would otherwise take every tap while it runs, so
+   a tap on a mode would land on <html> and close the popup. Let taps reach the live page. */
+::view-transition { pointer-events: none; }
 
 :root.theme-reveal::view-transition-old(root),
 :root.theme-reveal::view-transition-new(root) {

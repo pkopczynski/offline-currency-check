@@ -89,7 +89,7 @@ Theme changes use a View Transition (a circle growing from the icon; a crossfade
 changes) where supported, otherwise a CSS color fade; with reduced motion they are instant.
 The popup and the tap sounds (short synthesized fingernail-on-glass taps: six voices that differ
 in pitch, decay and click, picked at random and never the same one twice in a row) are created
-on first use after a user gesture. The icon stays pressed-looking once it has been used. There
+on first use after a user gesture. The icon looks pressed in while the popup is open. There
 is no sound setting.
 
 ## Service worker and updates

@@ -16,6 +16,8 @@ const MODE_LABEL: Record<ThemeMode, string> = { dark: 'Dark', light: 'Light', au
 // After returning to the foreground, a reading older than the hidden period is only trusted
 // until this long; if the sensor stays silent we fall back to the clock.
 const STALE_READING_MS = 3000;
+// Share of its final radius at which the reveal circle has covered the whole viewport.
+const REVEAL_COVERAGE = 0.88;
 
 interface Point { x: number; y: number }
 
@@ -65,7 +67,7 @@ export function initTheme(storage: KeyValueStorage) {
   }
 
   let transitionToken = 0;
-  let fadeTimer: number | undefined;
+  let transitioning = false; // a View Transition is running (see the pointerdown handler)
   // The reveal animation lives on the root's pseudo-element, so it outlives a skipped transition
   // and would keep clipping the next one's snapshot. Only one may exist at a time.
   let reveal: Animation | null = null;
@@ -79,14 +81,19 @@ export function initTheme(storage: KeyValueStorage) {
 
     if (typeof document.startViewTransition === 'function') {
       const token = ++transitionToken;
+      transitioning = true;
       root.classList.toggle('theme-reveal', !!origin);
       reveal?.cancel();
       reveal = null;
       // applyToDom reads the latest state, so a transition skipped by a newer one is harmless.
       const transition = document.startViewTransition(applyToDom);
       if (origin) {
-        // Ceil: a sub-pixel short radius would leave a sliver of the old theme in the far corner.
-        const radius = Math.ceil(Math.hypot(Math.max(origin.x, innerWidth - origin.x), Math.max(origin.y, innerHeight - origin.y)));
+        // The circle ends past the farthest corner, so it is still moving when it covers the last
+        // of the old theme; ending exactly on the corner left a sliver there that crawled to a
+        // standstill. The margin also covers a snapshot slightly larger than innerWidth/Height
+        // (mobile browser bars), which would otherwise leave a strip that snaps away at the end.
+        const corner = Math.hypot(Math.max(origin.x, innerWidth - origin.x), Math.max(origin.y, innerHeight - origin.y));
+        const radius = Math.ceil(corner / REVEAL_COVERAGE);
         transition.ready.then(() => {
           if (token !== transitionToken) return;
           const circle = (r: number) => `circle(${r}px at ${origin.x}px ${origin.y}px)`;
@@ -98,16 +105,24 @@ export function initTheme(storage: KeyValueStorage) {
       }
       transition.finished.catch(() => {}).then(() => {
         if (token !== transitionToken) return;
+        transitioning = false;
         root.classList.remove('theme-reveal');
         reveal = null;
       });
       return;
     }
 
+    // Fallback: keep .theme-fade until the color transitions it started have actually ended.
+    // Removing it earlier (the old fixed timer) drops --color-bg from html's transition list,
+    // which cancels that transition and snaps the background to its final color.
+    const token = ++transitionToken;
     root.classList.add('theme-fade');
     applyToDom();
-    clearTimeout(fadeTimer);
-    fadeTimer = window.setTimeout(() => root.classList.remove('theme-fade'), duration + 150);
+    // Without getAnimations (very old browsers) the class goes at once and the change is instant.
+    const fades = (document.getAnimations?.() ?? []).filter((a) => a instanceof CSSTransition).map((a) => a.finished);
+    Promise.allSettled(fades).then(() => {
+      if (token === transitionToken) root.classList.remove('theme-fade');
+    });
   }
 
   function hintText(): string {
@@ -261,7 +276,6 @@ export function initTheme(storage: KeyValueStorage) {
 
   toggle.addEventListener('click', () => {
     audio.tap();
-    toggle.dataset.used = 'true'; // stays pressed-looking from the first use (see main.css)
     setOpen(!open);
   });
 
@@ -273,6 +287,9 @@ export function initTheme(storage: KeyValueStorage) {
   });
 
   document.addEventListener('pointerdown', (event) => {
+    // During a View Transition the browser may target taps at <html> (its overlay) even where
+    // the popup is; main.css lets them through, and this keeps such a tap from closing it.
+    if (transitioning && event.target === root) return;
     if (open && event.target instanceof Node && !menu.contains(event.target)) setOpen(false);
   });
   document.addEventListener('keydown', (event) => {
