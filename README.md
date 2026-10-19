@@ -137,3 +137,6 @@ Actions**. The app is then served at `https://<user>.github.io/<repo>/`.
 10. From/To: a first visit shows EUR, PLN and TRY with EUR → PLN; picking a different currency
     in From or To plays a glass tap (re-picking the current one doesn't); reload → the From/To
     pair is kept.
+11. Device language: switch the browser/device language (e.g. to Polish) and reload → the
+    currency names follow it (e.g. "CHF – frank szwajcarski"), still sorted by code; all other
+    text stays in English.
