@@ -4,7 +4,7 @@ import { createGlassAudio } from './glass-audio.ts';
 import type { GlassAudio } from './glass-audio.ts';
 import { startAmbientLight } from './ambient-light.ts';
 import type { AmbientLightHandle } from './ambient-light.ts';
-import type { KeyValueStorage } from './rates.ts';
+import type { KeyValueStorage } from './storage.ts';
 import { initPopup } from './popup.ts';
 import { byId } from './dom.ts';
 import {

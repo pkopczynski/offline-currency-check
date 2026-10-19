@@ -3,6 +3,7 @@
 
 import { SUPPORTED_CURRENCIES } from './supported-currencies.ts';
 import type { SupportedCurrency } from './supported-currencies.ts';
+import type { KeyValueStorage } from './storage.ts';
 
 // The currencies cached by schema 1 (before every Supported currency was fetched).
 const V1_CURRENCIES = ['EUR', 'PLN', 'TRY'] as const;
@@ -37,12 +38,6 @@ export type RefreshResult =
   | { status: 'current'; entry: CacheEntry }
   | { status: 'cached'; entry: CacheEntry; reason: FailureReason }
   | { status: 'unavailable'; entry: null; reason: FailureReason };
-
-// The subset of Web Storage we use; localStorage and in-memory fakes both fit.
-export interface KeyValueStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-}
 
 // The subset of fetch we use; window.fetch fits.
 export interface FetchResponse {

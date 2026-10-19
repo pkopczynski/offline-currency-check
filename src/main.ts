@@ -3,7 +3,8 @@ import { byId } from './dom.ts';
 import {
   loadCache, refreshRates, convert, parseAmount, formatAge,
 } from './rates.ts';
-import type { CacheEntry, FailureReason, KeyValueStorage, RefreshResult } from './rates.ts';
+import type { CacheEntry, FailureReason, RefreshResult } from './rates.ts';
+import type { KeyValueStorage } from './storage.ts';
 import { initTheme } from './theme-control.ts';
 import { createGlassAudio } from './glass-audio.ts';
 import { preferredLocale } from './locale.ts';

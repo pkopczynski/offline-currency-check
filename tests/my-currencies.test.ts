@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { MY_CURRENCIES_KEY, load, save, add, remove, options } from '../src/my-currencies.ts';
-import type { KeyValueStorage } from '../src/rates.ts';
+import type { KeyValueStorage } from '../src/storage.ts';
 
 function memoryStorage(initial: Record<string, string> = {}) {
   const data: Record<string, string> = { ...initial };

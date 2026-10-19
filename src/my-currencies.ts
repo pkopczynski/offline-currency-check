@@ -1,6 +1,6 @@
 // My currencies: the currencies the user converts between, plus the From/To pair.
 // No DOM access, so it is unit tested in Node. Storage is passed in, like the theme module.
-import type { KeyValueStorage } from './rates.ts';
+import type { KeyValueStorage } from './storage.ts';
 import { CURRENCY_NAMES, SUPPORTED_CURRENCIES, isSupportedCurrency } from './supported-currencies.ts';
 import type { SupportedCurrency } from './supported-currencies.ts';
 

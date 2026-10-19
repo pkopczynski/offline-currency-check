@@ -5,7 +5,8 @@ import {
   validateRates, loadCache, saveCache, fetchRates, refreshRates,
   convert, parseAmount, formatAge,
 } from '../src/rates.ts';
-import type { CacheEntry, FetchFn, KeyValueStorage } from '../src/rates.ts';
+import type { CacheEntry, FetchFn } from '../src/rates.ts';
+import type { KeyValueStorage } from '../src/storage.ts';
 
 const RATES = { EUR: 1, PLN: 4.3825, TRY: 54.9822 };
 const API_PAYLOAD = { amount: 1.0, base: 'EUR', date: '2026-10-07', rates: { PLN: 4.3825, TRY: 54.9822 } };
