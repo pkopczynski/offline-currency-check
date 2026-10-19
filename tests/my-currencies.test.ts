@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { MY_CURRENCIES_KEY, load, save } from '../src/my-currencies.ts';
+import { MY_CURRENCIES_KEY, load, save, add } from '../src/my-currencies.ts';
 import type { KeyValueStorage } from '../src/rates.ts';
 
 function memoryStorage(initial: Record<string, string> = {}) {
@@ -94,5 +94,29 @@ describe('save', () => {
       setItem: () => { throw new Error('QuotaExceededError'); },
     };
     assert.equal(save(broken, { currencies: ['EUR', 'PLN'], from: 'EUR', to: 'PLN' }), false);
+  });
+});
+
+describe('add', () => {
+  const state = { currencies: ['EUR', 'PLN', 'TRY'], from: 'TRY', to: 'EUR' } as const;
+  const start = () => ({ ...state, currencies: [...state.currencies] });
+
+  test('adds a Supported currency in code order and leaves From/To alone', () => {
+    assert.deepEqual(add(start(), 'GBP'), { currencies: ['EUR', 'GBP', 'PLN', 'TRY'], from: 'TRY', to: 'EUR' });
+  });
+
+  test('does nothing for a currency already in the list', () => {
+    assert.deepEqual(add(start(), 'PLN'), state);
+  });
+
+  test('does nothing for an unsupported code', () => {
+    assert.deepEqual(add(start(), 'RUB'), state);
+    assert.deepEqual(add(start(), ''), state);
+  });
+
+  test('does not change the state it was given', () => {
+    const before = start();
+    add(before, 'GBP');
+    assert.deepEqual(before, state);
   });
 });

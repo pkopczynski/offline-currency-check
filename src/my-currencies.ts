@@ -63,3 +63,9 @@ export function save(storage: KeyValueStorage, state: MyCurrenciesState): boolea
     return false;
   }
 }
+
+// Adds a Supported currency not yet in the list. Returns the same state when there's nothing to add.
+export function add(state: MyCurrenciesState, code: string): MyCurrenciesState {
+  if (!isSupportedCurrency(code) || state.currencies.includes(code)) return state;
+  return { ...state, currencies: [...state.currencies, code].sort() };
+}
