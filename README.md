@@ -54,7 +54,7 @@ src/popup.ts             header popup behaviour shared by both popups (open/clos
 src/theme.ts             theme decisions: clock schedule, light thresholds, variants, prefs (no DOM; unit tested)
 src/theme-control.ts     theme popup, applying themes, Auto-mode inputs and transitions
 src/ambient-light.ts     AmbientLightSensor wrapper
-src/glass-audio.ts       synthesized glass-tap sounds (Web Audio)
+src/glass-audio.ts       synthesized glass-tap, pop and inhale sounds (Web Audio)
 src/sw.ts                service worker, built to dist/sw.js
 src/styles/tokens.css    design tokens (palette, light/dark themes and variants, spacing, radii, type, glass, motion)
 src/styles/main.css      layout and components, using only semantic tokens
@@ -77,7 +77,9 @@ so a currency added offline converts straight away from the saved rates.
 
 The popup behaves like the theme popup: Escape and tapping outside close it, the button looks
 pressed in while it is open, a glass tap plays on open and close, and opening either popup
-closes the other.
+closes the other. Adding a currency plays a soft, low pop and removing one a short inhale
+(both synthesized, with a slight random pitch variation, no louder than the taps). A disabled ×
+makes no sound, and a removal that switches From or To plays only the inhale.
 
 ## Theme
 
@@ -171,3 +173,7 @@ Actions**. The app is then served at `https://<user>.github.io/<repo>/`.
 16. Device language: switch the browser/device language (e.g. to Polish) and reload → the
     currency names in From/To and the currencies popup follow it (e.g. "CHF – frank szwajcarski"),
     still sorted by code; all other text stays in English.
+17. Sounds (with the volume up): opening and closing the coins popup plays a glass tap; adding
+    a currency plays a soft, low pop; removing one plays a short inhale; repeating either sounds
+    slightly different in pitch; neither is louder than the taps. A disabled × makes no sound.
+    Removing the currency shown in From or To plays only the inhale, with no extra tap.

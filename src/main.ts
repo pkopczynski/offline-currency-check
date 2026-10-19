@@ -67,9 +67,9 @@ function applyCurrencies(next: MyCurrenciesState, sound: 'pop' | 'inhale') {
   saveMyCurrencies(storage, currencies);
   renderCurrencySelects();
   renderResult();
-  // Sound hook (#9): play the pop for an add and the inhale for a remove here, e.g.
-  // `sound === 'pop' ? audio.pop() : audio.inhale()`. Only reached on a real change.
-  void sound;
+  // Only reached on a real change, so a refused removal (disabled ×) stays silent.
+  if (sound === 'pop') audio.pop();
+  else audio.inhale();
 }
 
 const noMenu: CurrenciesMenu = { render() {} };
