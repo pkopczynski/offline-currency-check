@@ -1,7 +1,7 @@
 // My currencies: the currencies the user converts between, plus the From/To pair.
 // No DOM access, so it is unit tested in Node. Storage is passed in, like the theme module.
 import type { KeyValueStorage } from './rates.ts';
-import { isSupportedCurrency } from './supported-currencies.ts';
+import { CURRENCY_NAMES, SUPPORTED_CURRENCIES, isSupportedCurrency } from './supported-currencies.ts';
 import type { SupportedCurrency } from './supported-currencies.ts';
 
 export const MY_CURRENCIES_KEY = 'my-currencies-v1';
@@ -78,4 +78,35 @@ export function remove(state: MyCurrenciesState, code: string): MyCurrenciesStat
   const from = state.from === code ? firstOther(currencies, state.to === code ? null : state.to) : state.from;
   const to = state.to === code ? firstOther(currencies, from) : state.to;
   return { currencies, from, to };
+}
+
+export interface CurrencyOption {
+  code: SupportedCurrency;
+  name: string;
+  // "CODE – name", as shown in the dropdowns.
+  label: string;
+}
+
+export interface CurrencyOptions {
+  // My currencies, for the From and To dropdowns.
+  mine: CurrencyOption[];
+  // Supported currencies not yet in My currencies, for the add select.
+  addable: CurrencyOption[];
+}
+
+type NameOf = (code: SupportedCurrency) => string;
+
+const englishName: NameOf = (code) => CURRENCY_NAMES[code];
+
+// Both lists are sorted by code, so the order is the same in every language.
+export function options(state: MyCurrenciesState): CurrencyOptions {
+  const nameOf = englishName;
+  const option = (code: SupportedCurrency): CurrencyOption => {
+    const name = nameOf(code);
+    return { code, name, label: `${code} – ${name}` };
+  };
+  return {
+    mine: [...state.currencies].sort().map(option),
+    addable: SUPPORTED_CURRENCIES.filter((code) => !state.currencies.includes(code)).map(option),
+  };
 }

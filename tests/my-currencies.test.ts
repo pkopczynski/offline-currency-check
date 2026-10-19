@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { MY_CURRENCIES_KEY, load, save, add, remove } from '../src/my-currencies.ts';
+import { MY_CURRENCIES_KEY, load, save, add, remove, options } from '../src/my-currencies.ts';
 import type { KeyValueStorage } from '../src/rates.ts';
 
 function memoryStorage(initial: Record<string, string> = {}) {
@@ -162,5 +162,26 @@ describe('remove', () => {
       remove(state(['EUR', 'GBP', 'PLN'], 'EUR', 'EUR'), 'EUR'),
       state(['GBP', 'PLN'], 'GBP', 'PLN'),
     );
+  });
+});
+
+describe('options', () => {
+  test('lists My currencies as "CODE – name" in English, sorted by code', () => {
+    const { mine } = options({ currencies: ['USD', 'EUR', 'PLN'], from: 'EUR', to: 'PLN' });
+    assert.deepEqual(mine, [
+      { code: 'EUR', name: 'Euro', label: 'EUR – Euro' },
+      { code: 'PLN', name: 'Polish złoty', label: 'PLN – Polish złoty' },
+      { code: 'USD', name: 'US dollar', label: 'USD – US dollar' },
+    ]);
+  });
+
+  test('lists the Supported currencies not yet added, sorted by code', () => {
+    const { addable } = options({ currencies: ['EUR', 'PLN', 'TRY'], from: 'EUR', to: 'PLN' });
+    const codes = addable.map((o) => o.code);
+    assert.equal(codes.length, 27);
+    assert.deepEqual(codes.slice(0, 7), ['AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK']);
+    assert.deepEqual(codes.slice(-3), ['THB', 'USD', 'ZAR']);
+    for (const code of ['EUR', 'PLN', 'TRY']) assert.ok(!codes.includes(code as never), code);
+    assert.deepEqual(addable.find((o) => o.code === 'GBP'), { code: 'GBP', name: 'British pound', label: 'GBP – British pound' });
   });
 });
