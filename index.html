@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#0b1030">
-  <meta name="description" content="Offline-first currency converter for EUR, PLN and TRY.">
+  <meta name="description" content="Offline-first converter between European Central Bank currencies.">
   <title>Currency Converter</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
@@ -41,37 +41,52 @@
     <header class="app-header">
       <div class="app-title">
         <h1>Currency Converter</h1>
-        <p>EUR · PLN · TRY – works offline</p>
+        <p>Works offline</p>
       </div>
 
-      <div class="theme-menu" id="theme-menu">
-        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Theme" aria-haspopup="dialog" aria-expanded="false" aria-controls="theme-popup">
-          <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
-          <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg>
-          <span class="theme-toggle-auto" aria-hidden="true"></span>
-        </button>
+      <div class="header-actions">
+        <div class="popup-menu" id="currencies-menu">
+          <button id="currencies-toggle" class="icon-toggle" type="button" aria-label="Manage currencies" aria-haspopup="dialog" aria-expanded="false" aria-controls="currencies-popup">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><ellipse cx="9" cy="6.5" rx="6" ry="2.5"/><path d="M3 6.5v4c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-4M3 10.5v4c0 1.4 2.7 2.5 6 2.5 1 0 2-.1 2.8-.3"/><ellipse cx="15.5" cy="15" rx="5.5" ry="2.3" class="icon-fill"/><path d="M10 15v3.2c0 1.3 2.5 2.3 5.5 2.3s5.5-1 5.5-2.3V15"/></svg>
+          </button>
 
-        <div id="theme-popup" class="theme-popup" role="dialog" aria-label="Theme">
-          <div class="theme-modes" role="radiogroup" aria-label="Theme mode">
-            <span class="theme-indicator" aria-hidden="true"></span>
-            <label class="theme-option" title="Dark">
-              <input type="radio" name="theme-mode" value="dark" aria-label="Dark">
-              <span class="theme-option-face">
-                <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg>
-              </span>
-            </label>
-            <label class="theme-option" title="Light">
-              <input type="radio" name="theme-mode" value="light" aria-label="Light">
-              <span class="theme-option-face">
-                <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
-              </span>
-            </label>
-            <label class="theme-option" title="Auto">
-              <input type="radio" name="theme-mode" value="auto" aria-label="Auto">
-              <span class="theme-option-face">
-                <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18z" fill="currentColor"/></svg>
-              </span>
-            </label>
+          <div id="currencies-popup" class="popup currencies-popup" role="dialog" aria-labelledby="currencies-title">
+            <h2 id="currencies-title" class="popup-title">My currencies</h2>
+            <!-- Filled by currencies-control.ts -->
+            <ul id="my-currencies-list" class="currency-list" aria-labelledby="currencies-title"></ul>
+            <select id="add-currency" class="add-currency" aria-label="Add currency"></select>
+          </div>
+        </div>
+
+        <div class="popup-menu" id="theme-menu">
+          <button id="theme-toggle" class="icon-toggle theme-toggle" type="button" aria-label="Theme" aria-haspopup="dialog" aria-expanded="false" aria-controls="theme-popup">
+            <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+            <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg>
+            <span class="theme-toggle-auto" aria-hidden="true"></span>
+          </button>
+
+          <div id="theme-popup" class="popup theme-popup" role="dialog" aria-label="Theme">
+            <div class="theme-modes" role="radiogroup" aria-label="Theme mode">
+              <span class="theme-indicator" aria-hidden="true"></span>
+              <label class="theme-option" title="Dark">
+                <input type="radio" name="theme-mode" value="dark" aria-label="Dark">
+                <span class="theme-option-face">
+                  <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg>
+                </span>
+              </label>
+              <label class="theme-option" title="Light">
+                <input type="radio" name="theme-mode" value="light" aria-label="Light">
+                <span class="theme-option-face">
+                  <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+                </span>
+              </label>
+              <label class="theme-option" title="Auto">
+                <input type="radio" name="theme-mode" value="auto" aria-label="Auto">
+                <span class="theme-option-face">
+                  <svg class="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18z" fill="currentColor"/></svg>
+                </span>
+              </label>
+            </div>
           </div>
         </div>
       </div>

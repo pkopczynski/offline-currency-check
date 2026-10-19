@@ -6,8 +6,11 @@ import type { CacheEntry, FailureReason, KeyValueStorage, RefreshResult } from '
 import { initTheme } from './theme-control.ts';
 import { createGlassAudio } from './glass-audio.ts';
 import {
-  load as loadMyCurrencies, save as saveMyCurrencies, options as currencyOptions,
+  MIN_CURRENCIES, add as addCurrency, load as loadMyCurrencies, remove as removeCurrency,
+  save as saveMyCurrencies, options as currencyOptions,
 } from './my-currencies.ts';
+import { initCurrenciesMenu } from './currencies-control.ts';
+import type { CurrenciesMenu } from './currencies-control.ts';
 import type { CurrencyOption, MyCurrenciesState } from './my-currencies.ts';
 
 function byId<T extends HTMLElement>(id: string, type: new () => T): T {
@@ -49,10 +52,38 @@ function fillSelect(select: HTMLSelectElement, entries: CurrencyOption[], select
 }
 
 function renderCurrencySelects() {
-  const { mine } = currencyOptions(currencies);
-  fillSelect(fromSelect, mine, currencies.from);
-  fillSelect(toSelect, mine, currencies.to);
+  const options = currencyOptions(currencies);
+  fillSelect(fromSelect, options.mine, currencies.from);
+  fillSelect(toSelect, options.mine, currencies.to);
+  currenciesMenu.render(options, currencies.currencies.length > MIN_CURRENCIES);
 }
+
+// An add or remove from the Manage currencies popup. The selects are rebuilt rather than sent a
+// `change`, so a removal that switches From or To plays no tap.
+function applyCurrencies(next: MyCurrenciesState, sound: 'pop' | 'inhale') {
+  if (next === currencies) return; // add/remove return the same state when nothing changed
+  currencies = next;
+  saveMyCurrencies(storage, currencies);
+  renderCurrencySelects();
+  renderResult();
+  // Sound hook (#9): play the pop for an add and the inhale for a remove here, e.g.
+  // `sound === 'pop' ? audio.pop() : audio.inhale()`. Only reached on a real change.
+  void sound;
+}
+
+const noMenu: CurrenciesMenu = { render() {} };
+// Like theming, managing currencies is optional: if it fails to start, the converter must still work.
+const currenciesMenu: CurrenciesMenu = (() => {
+  try {
+    return initCurrenciesMenu(audio, {
+      add: (code) => applyCurrencies(addCurrency(currencies, code), 'pop'),
+      remove: (code) => applyCurrencies(removeCurrency(currencies, code), 'inhale'),
+    });
+  } catch (err) {
+    console.warn('Currencies menu setup failed:', err);
+    return noMenu;
+  }
+})();
 
 // `change` only fires when the user picks a different currency, so the tap never plays for a no-op.
 function onPairChange() {
