@@ -4,9 +4,11 @@
 import { SUPPORTED_CURRENCIES } from './supported-currencies.ts';
 import type { SupportedCurrency } from './supported-currencies.ts';
 
-export const CURRENCIES = ['EUR', 'PLN', 'TRY'] as const;
-export type Currency = (typeof CURRENCIES)[number];
-export type Rates = Record<Currency, number>;
+// The currencies cached by schema 1 (before every Supported currency was fetched).
+const V1_CURRENCIES = ['EUR', 'PLN', 'TRY'] as const;
+
+// Rates per 1 EUR, keyed by currency code. Partial: the ECB may not publish every currency.
+export type Rates = Partial<Record<SupportedCurrency, number>>;
 
 export const BASE = 'EUR' satisfies SupportedCurrency;
 export const CACHE_KEY = 'fx-rates-v1';
@@ -58,7 +60,8 @@ export class RateFetchError extends Error {
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
 const isPositiveNumber = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0;
 
-// Turns a Frankfurter response into our rate map, or returns null if anything is wrong.
+// Turns a Frankfurter response into our rate map, or returns null if it's unusable.
+// Invalid or unknown rates are dropped; at least one valid rate besides the base is required.
 export function validateRates(payload: unknown): { rates: Rates; rateDate: string } | null {
   if (!isRecord(payload)) return null;
   if (payload.base !== BASE) return null;
@@ -66,14 +69,16 @@ export function validateRates(payload: unknown): { rates: Rates; rateDate: strin
   const source = payload.rates;
   if (!isRecord(source)) return null;
 
-  const rates: Partial<Rates> = { [BASE]: 1 };
-  for (const code of CURRENCIES) {
+  const rates: Rates = { [BASE]: 1 };
+  let found = 0;
+  for (const code of SUPPORTED_CURRENCIES) {
     if (code === BASE) continue;
     const rate = source[code];
-    if (!isPositiveNumber(rate)) return null;
+    if (!isPositiveNumber(rate)) continue;
     rates[code] = rate;
+    found++;
   }
-  return { rates: rates as Rates, rateDate: payload.date };
+  return found > 0 ? { rates, rateDate: payload.date } : null;
 }
 
 function isValidEntry(entry: unknown): entry is CacheEntry {
@@ -86,7 +91,7 @@ function isValidEntry(entry: unknown): entry is CacheEntry {
     typeof entry.fetchedAt === 'string' &&
     !Number.isNaN(Date.parse(entry.fetchedAt)) &&
     isRecord(rates) &&
-    CURRENCIES.every((c) => isPositiveNumber(rates[c]))
+    V1_CURRENCIES.every((c) => isPositiveNumber(rates[c]))
   );
 }
 

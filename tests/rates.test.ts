@@ -84,17 +84,23 @@ describe('validateRates', () => {
     assert.deepEqual(validateRates(API_PAYLOAD), { rates: RATES, rateDate: '2026-10-07' });
   });
 
-  test('rejects malformed payloads', () => {
+  test('keeps the valid rates and drops invalid, unknown or missing ones', () => {
+    const payload = {
+      ...API_PAYLOAD,
+      rates: { PLN: 4.3825, TRY: '54.98', USD: 0, GBP: -1, JPY: Infinity, XYZ: 2, CHF: 0.93, EUR: 7 },
+    };
+    assert.deepEqual(validateRates(payload), { rates: { EUR: 1, PLN: 4.3825, CHF: 0.93 }, rateDate: '2026-10-07' });
+  });
+
+  test('rejects malformed payloads and payloads with no non-base rate', () => {
     const cases = [
       null, 'x', {},
       { ...API_PAYLOAD, base: 'USD' },
       { ...API_PAYLOAD, date: 'yesterday' },
       { ...API_PAYLOAD, rates: null },
-      { ...API_PAYLOAD, rates: { PLN: 4.38 } },
-      { ...API_PAYLOAD, rates: { PLN: '4.38', TRY: 54.98 } },
-      { ...API_PAYLOAD, rates: { PLN: 0, TRY: 54.98 } },
-      { ...API_PAYLOAD, rates: { PLN: -4.38, TRY: 54.98 } },
-      { ...API_PAYLOAD, rates: { PLN: Infinity, TRY: 54.98 } },
+      { ...API_PAYLOAD, rates: {} },
+      { ...API_PAYLOAD, rates: { EUR: 1 } },
+      { ...API_PAYLOAD, rates: { PLN: '4.38', TRY: 0, XYZ: 3 } },
     ];
     for (const c of cases) assert.equal(validateRates(c), null, JSON.stringify(c));
   });
@@ -172,7 +178,7 @@ describe('refreshRates', () => {
   const failures: Record<'network' | 'http' | 'invalid', FetchFn> = {
     network: async () => { throw new TypeError('Failed to fetch'); },
     http: async () => ({ ok: false, status: 500, json: async () => ({}) }),
-    invalid: okFetch({ base: 'EUR', date: '2026-10-07', rates: { PLN: 4.38 } }),
+    invalid: okFetch({ base: 'EUR', date: '2026-10-07', rates: {} }),
   };
 
   for (const [reason, fetchFn] of Object.entries(failures)) {
