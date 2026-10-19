@@ -111,3 +111,10 @@ export function pickVariant(previous: number, random: () => number = Math.random
   const n = Math.floor(random() * (VARIANT_COUNT - 1)) % (VARIANT_COUNT - 1);
   return n >= previous ? n + 1 : n;
 }
+
+// A CSS <time> value in milliseconds. Unregistered custom properties keep the text as written,
+// and the build's CSS minifier rewrites "600ms" as ".6s", so both units must be understood.
+export function cssTimeToMs(value: string): number {
+  const n = parseFloat(value) || 0;
+  return /[^m]s$/i.test(value.trim()) ? n * 1000 : n;
+}

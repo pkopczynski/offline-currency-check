@@ -131,3 +131,6 @@ Actions**. The app is then served at `https://<user>.github.io/<repo>/`.
 8. Theme: Dark and Light override the clock; Auto follows the clock (change the device time to
    check); the choice survives a reload; Escape and tapping outside close the popup; with
    reduced motion enabled the theme changes instantly.
+9. Upgrade while offline: with a build that saved `fx-rates-v1` loaded once, deploy this
+   version, go offline and reload → status shows **Cached** with the old rates. Back online,
+   **Refresh rates** saves `fx-rates-v2` with every currency the ECB publishes.

@@ -76,6 +76,14 @@ function renderResult() {
     return;
   }
 
+  // convert() gives null for a currency with no rate, even for an amount of 1.
+  const missing = [from, to].find((code) => convert(1, code, code, rates) === null);
+  if (missing) {
+    resultEl.textContent = '—';
+    rateEl.textContent = `No rate for ${missing} in the saved rates. Refresh while online.`;
+    return;
+  }
+
   rateEl.textContent = `1 ${from} = ${formatRate(convert(1, from, to, rates))} ${to}`;
   const value = amount === null ? null : convert(amount, from, to, rates);
   resultEl.textContent = value === null ? '—' : formatMoney(value, to);

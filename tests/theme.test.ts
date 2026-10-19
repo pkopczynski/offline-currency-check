@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import {
   THEME_KEY, VARIANT_COUNT, DEFAULT_AUTO_CONFIG as CFG,
-  loadPrefs, savePrefs, themeFromClock, nextClockChange, themeFromLux, resolveAuto, pickVariant,
+  loadPrefs, savePrefs, themeFromClock, nextClockChange, themeFromLux, resolveAuto, pickVariant, cssTimeToMs,
 } from '../src/theme.ts';
 import type { KeyValueStorage } from '../src/rates.ts';
 
@@ -212,5 +212,20 @@ describe('inline pre-paint script in index.html', () => {
     const result = run(stored, 12).dataset;
     assert.equal(result.theme, prefs.mode);
     assert.equal(result.variant, prefs.variants.light);
+  });
+});
+
+describe('cssTimeToMs', () => {
+  test('milliseconds and seconds, as in the dev server and the minified build', () => {
+    assert.equal(cssTimeToMs('600ms'), 600);
+    assert.equal(cssTimeToMs('.6s'), 600);
+    assert.equal(cssTimeToMs('0.26s'), 260);
+    assert.equal(cssTimeToMs(' 150ms '), 150);
+  });
+
+  test('reduced motion and missing values are 0', () => {
+    assert.equal(cssTimeToMs('0s'), 0);
+    assert.equal(cssTimeToMs('0ms'), 0);
+    assert.equal(cssTimeToMs(''), 0);
   });
 });
