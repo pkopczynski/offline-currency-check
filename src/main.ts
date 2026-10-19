@@ -5,6 +5,7 @@ import {
 import type { CacheEntry, FailureReason, KeyValueStorage, RefreshResult } from './rates.ts';
 import { initTheme } from './theme-control.ts';
 import { createGlassAudio } from './glass-audio.ts';
+import { preferredLocale } from './locale.ts';
 import {
   load as loadMyCurrencies, save as saveMyCurrencies, options as currencyOptions,
 } from './my-currencies.ts';
@@ -49,7 +50,7 @@ function fillSelect(select: HTMLSelectElement, entries: CurrencyOption[], select
 }
 
 function renderCurrencySelects() {
-  const { mine } = currencyOptions(currencies);
+  const { mine } = currencyOptions(currencies, preferredLocale(navigator));
   fillSelect(fromSelect, mine, currencies.from);
   fillSelect(toSelect, mine, currencies.to);
 }
