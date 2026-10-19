@@ -25,6 +25,52 @@ describe('load', () => {
     }
   });
 
+  const saved = (record: unknown) => memoryStorage({ [MY_CURRENCIES_KEY]: JSON.stringify(record) });
+
+  test('drops unknown codes and duplicates, and keeps the list sorted by code', () => {
+    assert.deepEqual(
+      load(saved({ currencies: ['USD', 'XXX', 'GBP', 'USD', 42, 'eur', 'RUB'], from: 'USD', to: 'GBP' })),
+      { currencies: ['GBP', 'USD'], from: 'USD', to: 'GBP' },
+    );
+  });
+
+  test('falls back to EUR, PLN and TRY when fewer than 2 currencies remain', () => {
+    assert.deepEqual(load(saved({ currencies: ['USD', 'XXX'], from: 'USD', to: 'USD' })), DEFAULT);
+    assert.deepEqual(load(saved({ currencies: [], from: 'EUR', to: 'PLN' })), DEFAULT);
+  });
+
+  test('resets an invalid From/To pair to EUR → PLN when both are in the list', () => {
+    assert.deepEqual(
+      load(saved({ currencies: ['EUR', 'PLN', 'USD'], from: 'XXX' })),
+      { currencies: ['EUR', 'PLN', 'USD'], from: 'EUR', to: 'PLN' },
+    );
+  });
+
+  test('resets only the invalid side, avoiding the other side when it can', () => {
+    assert.deepEqual(
+      load(saved({ currencies: ['EUR', 'PLN', 'USD'], from: 'USD', to: 'GBP' })),
+      { currencies: ['EUR', 'PLN', 'USD'], from: 'USD', to: 'PLN' },
+    );
+    assert.deepEqual(
+      load(saved({ currencies: ['EUR', 'PLN', 'USD'], from: 'GBP', to: 'EUR' })),
+      { currencies: ['EUR', 'PLN', 'USD'], from: 'PLN', to: 'EUR' },
+    );
+  });
+
+  test('without EUR or PLN, resets to the first valid choices', () => {
+    assert.deepEqual(
+      load(saved({ currencies: ['USD', 'GBP', 'JPY'], from: 'EUR', to: 'PLN' })),
+      { currencies: ['GBP', 'JPY', 'USD'], from: 'GBP', to: 'JPY' },
+    );
+  });
+
+  test('keeps a From/To pair that names the same currency twice', () => {
+    assert.deepEqual(
+      load(saved({ currencies: ['EUR', 'PLN'], from: 'PLN', to: 'PLN' })),
+      { currencies: ['EUR', 'PLN'], from: 'PLN', to: 'PLN' },
+    );
+  });
+
   test('gives the default state when storage throws', () => {
     const broken: KeyValueStorage = {
       getItem: () => { throw new Error('SecurityError'); },
