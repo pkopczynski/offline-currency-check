@@ -165,9 +165,52 @@ describe('remove', () => {
   });
 });
 
+// A fake Intl.DisplayNames factory: names come from `names`, keyed by locale then code.
+const fakeDisplayNames = (names: Record<string, Record<string, string | undefined>>) =>
+  (locale: string) => ({ of: (code: string) => names[locale]?.[code] });
+const noDisplayNames = () => { throw new TypeError('Intl.DisplayNames is not a constructor'); };
+
 describe('options', () => {
+  test('names currencies in the given locale', () => {
+    const displayNames = fakeDisplayNames({ pl: { CHF: 'frank szwajcarski', EUR: 'euro' } });
+    const { mine, addable } = options({ currencies: ['EUR', 'PLN'], from: 'EUR', to: 'PLN' }, 'pl', displayNames);
+    assert.deepEqual(mine[0], { code: 'EUR', name: 'euro', label: 'EUR – euro' });
+    assert.deepEqual(addable.find((o) => o.code === 'CHF'),
+      { code: 'CHF', name: 'frank szwajcarski', label: 'CHF – frank szwajcarski' });
+  });
+
+  test('sorts by code whatever the language', () => {
+    // In Polish, "dolar amerykański" < "euro" < "frank szwajcarski": not code order.
+    const displayNames = fakeDisplayNames({ pl: { USD: 'dolar amerykański', EUR: 'euro', CHF: 'frank szwajcarski' } });
+    const { mine } = options({ currencies: ['USD', 'EUR', 'CHF'], from: 'EUR', to: 'USD' }, 'pl', displayNames);
+    assert.deepEqual(mine.map((o) => o.code), ['CHF', 'EUR', 'USD']);
+  });
+
+  describe('falls back to the English name when Intl.DisplayNames', () => {
+    const state = { currencies: ['EUR', 'CHF'], from: 'EUR', to: 'CHF' } as const;
+    const chfName = (displayNames: Parameters<typeof options>[2]) =>
+      options({ ...state, currencies: [...state.currencies] }, 'pl', displayNames).mine[0]!.name;
+
+    test('is missing', () => {
+      assert.equal(chfName(noDisplayNames), 'Swiss franc');
+    });
+
+    test('throws when looking up a name', () => {
+      assert.equal(chfName(() => ({ of: () => { throw new RangeError('bad code'); } })), 'Swiss franc');
+    });
+
+    test('returns nothing', () => {
+      assert.equal(chfName(fakeDisplayNames({})), 'Swiss franc');
+      assert.equal(chfName(fakeDisplayNames({ pl: { CHF: '' } })), 'Swiss franc');
+    });
+
+    test('returns just the code', () => {
+      assert.equal(chfName(fakeDisplayNames({ pl: { CHF: 'CHF' } })), 'Swiss franc');
+    });
+  });
+
   test('lists My currencies as "CODE – name" in English, sorted by code', () => {
-    const { mine } = options({ currencies: ['USD', 'EUR', 'PLN'], from: 'EUR', to: 'PLN' });
+    const { mine } = options({ currencies: ['USD', 'EUR', 'PLN'], from: 'EUR', to: 'PLN' }, 'en', noDisplayNames);
     assert.deepEqual(mine, [
       { code: 'EUR', name: 'Euro', label: 'EUR – Euro' },
       { code: 'PLN', name: 'Polish złoty', label: 'PLN – Polish złoty' },
@@ -176,7 +219,7 @@ describe('options', () => {
   });
 
   test('lists the Supported currencies not yet added, sorted by code', () => {
-    const { addable } = options({ currencies: ['EUR', 'PLN', 'TRY'], from: 'EUR', to: 'PLN' });
+    const { addable } = options({ currencies: ['EUR', 'PLN', 'TRY'], from: 'EUR', to: 'PLN' }, 'en', noDisplayNames);
     const codes = addable.map((o) => o.code);
     assert.equal(codes.length, 27);
     assert.deepEqual(codes.slice(0, 7), ['AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK']);

@@ -96,11 +96,39 @@ export interface CurrencyOptions {
 
 type NameOf = (code: SupportedCurrency) => string;
 
-const englishName: NameOf = (code) => CURRENCY_NAMES[code];
+// The part of Intl.DisplayNames that options uses, so tests can pass a fake.
+export interface CurrencyDisplayNames {
+  of(code: string): string | undefined;
+}
+export type DisplayNamesFactory = (locale: string) => CurrencyDisplayNames;
+
+const intlDisplayNames: DisplayNamesFactory = (locale) => new Intl.DisplayNames([locale], { type: 'currency' });
+
+// Names in `locale`, falling back to the built-in English name when Intl.DisplayNames is
+// missing, throws, or has no real name (nothing, or just the code).
+function localNames(locale: string, displayNames: DisplayNamesFactory): NameOf {
+  let names: CurrencyDisplayNames | null = null;
+  try {
+    names = displayNames(locale);
+  } catch {
+    // Missing or unsupported: English names.
+  }
+  return (code) => {
+    try {
+      const name = names?.of(code)?.trim();
+      if (name && name !== code) return name;
+    } catch {
+      // Fall through to English.
+    }
+    return CURRENCY_NAMES[code];
+  };
+}
 
 // Both lists are sorted by code, so the order is the same in every language.
-export function options(state: MyCurrenciesState): CurrencyOptions {
-  const nameOf = englishName;
+export function options(
+  state: MyCurrenciesState, locale: string, displayNames: DisplayNamesFactory = intlDisplayNames,
+): CurrencyOptions {
+  const nameOf = localNames(locale, displayNames);
   const option = (code: SupportedCurrency): CurrencyOption => {
     const name = nameOf(code);
     return { code, name, label: `${code} – ${name}` };

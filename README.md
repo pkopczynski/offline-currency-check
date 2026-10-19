@@ -168,3 +168,6 @@ Actions**. The app is then served at `https://<user>.github.io/<repo>/`.
 15. With one popup open, press the other popup's button → the first closes and the second
     opens; Escape and tapping outside close the currencies popup; Tab and the keyboard reach
     every × and the add select.
+16. Device language: switch the browser/device language (e.g. to Polish) and reload → the
+    currency names in From/To and the currencies popup follow it (e.g. "CHF – frank szwajcarski"),
+    still sorted by code; all other text stays in English.
