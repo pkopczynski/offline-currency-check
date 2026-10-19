@@ -41,13 +41,17 @@ describe('glass audio', () => {
   });
 
   test('a tap synthesizes ring partials and a click, resuming a suspended context', () => {
-    const { ctx, log } = fakeContext('suspended');
-    createGlassAudio(() => ctx).tap();
-    assert.equal(log.resumes, 1);
-    assert.equal(log.oscillators.length, 4);
-    assert.equal(log.sources, 1);
-    assert.ok(log.oscillators.every((o) => o.freq > 1000 && o.freq < 8000), 'partials stay below harsh frequencies');
-    assert.ok(log.oscillators.every((o) => o.stopAt! - ctx.currentTime < 0.3), 'short decay');
+    // Seeded so every voice is checked on every run (the voice is picked at random).
+    for (let voice = 0; voice < VOICES.length; voice++) {
+      const { ctx, log } = fakeContext('suspended');
+      createGlassAudio(() => ctx, () => (voice + 0.5) / VOICES.length).tap();
+      assert.equal(log.resumes, 1);
+      assert.equal(log.oscillators.length, 4);
+      assert.equal(log.sources, 1);
+      // The original select tap tops out at ~8.08 kHz, the highest partial in the pool.
+      assert.ok(log.oscillators.every((o) => o.freq > 1000 && o.freq < 8100), `voice ${voice}: partials stay below harsh frequencies`);
+      assert.ok(log.oscillators.every((o) => o.stopAt! - ctx.currentTime < 0.3), `voice ${voice}: short decay`);
+    }
   });
 
   test('the pool has six voices that differ in pitch and are equally loud and short', () => {
