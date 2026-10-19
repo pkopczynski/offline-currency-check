@@ -13,6 +13,8 @@ export type Rates = Partial<Record<SupportedCurrency, number>>;
 export const BASE = 'EUR' satisfies SupportedCurrency;
 export const CACHE_KEY = 'fx-rates-v2';
 export const SCHEMA = 2;
+// Legacy cache (EUR, PLN and TRY only), read as a fallback until the first v2 fetch is saved.
+const V1_CACHE_KEY = 'fx-rates-v1';
 export const API_URL =
   'https://api.frankfurter.dev/v1/latest?base=EUR&symbols=' +
   SUPPORTED_CURRENCIES.filter((c) => c !== BASE).join(',');
@@ -110,12 +112,17 @@ function isValidV1Rates(rates: Record<string, unknown>): boolean {
   return V1_CURRENCIES.every((c) => isPositiveNumber(rates[c]));
 }
 
+// Prefers a valid v2 entry; otherwise a valid v1 entry, so users upgrading offline keep their rates.
 export function loadCache(storage: KeyValueStorage): CacheEntry | null {
+  return readEntry(storage, CACHE_KEY, SCHEMA) ?? readEntry(storage, V1_CACHE_KEY, 1);
+}
+
+function readEntry(storage: KeyValueStorage, key: string, schema: CacheEntry['schema']): CacheEntry | null {
   try {
-    const raw = storage.getItem(CACHE_KEY);
+    const raw = storage.getItem(key);
     if (!raw) return null;
     const entry: unknown = JSON.parse(raw);
-    return isValidEntry(entry) && entry.schema === SCHEMA ? entry : null;
+    return isValidEntry(entry) && entry.schema === schema ? entry : null;
   } catch {
     return null;
   }

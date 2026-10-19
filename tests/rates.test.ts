@@ -127,6 +127,29 @@ describe('cache', () => {
     assert.equal(loadCache(memoryStorage({ [V2_KEY]: JSON.stringify(validEntry({ fetchedAt: 'nope' })) })), null);
   });
 
+  const v1Entry = { ...validEntry({ schema: 1, rates: { ...RATES } }) };
+
+  test('a valid v1 entry is loaded when there is no v2 entry', () => {
+    assert.deepEqual(loadCache(memoryStorage({ [V1_KEY]: JSON.stringify(v1Entry) })), v1Entry);
+  });
+
+  test('a v1 entry missing one of EUR, PLN and TRY is ignored', () => {
+    const broken = { ...v1Entry, rates: { EUR: 1, PLN: 4.38 } };
+    assert.equal(loadCache(memoryStorage({ [V1_KEY]: JSON.stringify(broken) })), null);
+  });
+
+  test('a valid v2 entry wins over a v1 entry', () => {
+    const storage = memoryStorage({ [V1_KEY]: JSON.stringify(v1Entry), [V2_KEY]: JSON.stringify(validEntry()) });
+    assert.deepEqual(loadCache(storage), validEntry());
+  });
+
+  test('a broken v2 entry falls back to a valid v1 entry', () => {
+    for (const broken of ['{not json', JSON.stringify(validEntry({ rates: { EUR: 1 } }))]) {
+      const storage = memoryStorage({ [V1_KEY]: JSON.stringify(v1Entry), [V2_KEY]: broken });
+      assert.deepEqual(loadCache(storage), v1Entry, broken);
+    }
+  });
+
   test('storage errors do not throw', () => {
     const broken: KeyValueStorage = { getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('full'); } };
     assert.equal(loadCache(broken), null);
@@ -205,6 +228,19 @@ describe('refreshRates', () => {
     const result = await refreshRates({ storage, fetchFn, now: () => NOW });
     assert.equal(result.status, 'cached');
     assert.equal(result.reason, 'invalid');
+  });
+
+  test('a v1 cache is used while offline and replaced by the next successful fetch', async () => {
+    const v1Entry = validEntry({ schema: 1, rates: { ...RATES } });
+    const storage = memoryStorage({ [V1_KEY]: JSON.stringify(v1Entry) });
+
+    const offline = await refreshRates({ storage, fetchFn: failures.network, now: () => NOW });
+    assert.deepEqual(offline, { status: 'cached', entry: v1Entry, reason: 'network' });
+
+    const online = await refreshRates({ storage, fetchFn: okFetch(), now: () => NOW });
+    assert.equal(online.status, 'current');
+    assert.equal(online.entry.schema, 2);
+    assert.deepEqual(loadCache(storage), online.entry);
   });
 
   test('failure with no cache reports unavailable', async () => {
