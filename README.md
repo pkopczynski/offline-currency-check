@@ -134,3 +134,6 @@ Actions**. The app is then served at `https://<user>.github.io/<repo>/`.
 9. Upgrade while offline: with a build that saved `fx-rates-v1` loaded once, deploy this
    version, go offline and reload → status shows **Cached** with the old rates. Back online,
    **Refresh rates** saves `fx-rates-v2` with every currency the ECB publishes.
+10. From/To: a first visit shows EUR, PLN and TRY with EUR → PLN; picking a different currency
+    in From or To plays a glass tap (re-picking the current one doesn't); reload → the From/To
+    pair is kept.

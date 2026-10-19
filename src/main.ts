@@ -4,6 +4,11 @@ import {
 } from './rates.ts';
 import type { CacheEntry, FailureReason, KeyValueStorage, RefreshResult } from './rates.ts';
 import { initTheme } from './theme-control.ts';
+import { createGlassAudio } from './glass-audio.ts';
+import {
+  load as loadMyCurrencies, save as saveMyCurrencies, options as currencyOptions,
+} from './my-currencies.ts';
+import type { CurrencyOption, MyCurrenciesState } from './my-currencies.ts';
 
 function byId<T extends HTMLElement>(id: string, type: new () => T): T {
   const el = document.getElementById(id);
@@ -32,8 +37,34 @@ const storage: KeyValueStorage = (() => {
   try { return window.localStorage; } catch { return null; }
 })() || { getItem: () => null, setItem: () => { throw new Error('no storage'); } };
 
+const audio = createGlassAudio();
+
 // Theming is optional: if it fails to start, the converter must still work.
-try { initTheme(storage); } catch (err) { console.warn('Theme setup failed:', err); }
+try { initTheme(storage, audio); } catch (err) { console.warn('Theme setup failed:', err); }
+
+let currencies: MyCurrenciesState = loadMyCurrencies(storage);
+
+function fillSelect(select: HTMLSelectElement, entries: CurrencyOption[], selected: string) {
+  select.replaceChildren(...entries.map(({ code, label }) => new Option(label, code, false, code === selected)));
+}
+
+function renderCurrencySelects() {
+  const { mine } = currencyOptions(currencies);
+  fillSelect(fromSelect, mine, currencies.from);
+  fillSelect(toSelect, mine, currencies.to);
+}
+
+// `change` only fires when the user picks a different currency, so the tap never plays for a no-op.
+function onPairChange() {
+  const from = currencies.currencies.find((c) => c === fromSelect.value);
+  const to = currencies.currencies.find((c) => c === toSelect.value);
+  if (from && to) {
+    currencies = { ...currencies, from, to };
+    saveMyCurrencies(storage, currencies);
+  }
+  audio.tap();
+  renderResult();
+}
 
 const formatMoney = (value: number, currency: string) =>
   new Intl.NumberFormat(undefined, {
@@ -139,8 +170,8 @@ async function refresh() {
 
 form.addEventListener('submit', (e) => e.preventDefault());
 amountInput.addEventListener('input', renderResult);
-fromSelect.addEventListener('change', renderResult);
-toSelect.addEventListener('change', renderResult);
+fromSelect.addEventListener('change', onPairChange);
+toSelect.addEventListener('change', onPairChange);
 refreshButton.addEventListener('click', refresh);
 // Keep the "x min ago" label accurate.
 setInterval(renderStatus, 60_000);
@@ -148,6 +179,7 @@ setInterval(renderStatus, 60_000);
 // Show cached rates immediately, then try to fetch fresh ones.
 const cached = loadCache(storage);
 if (cached) state = { status: 'cached', entry: cached };
+renderCurrencySelects();
 render();
 refresh();
 
