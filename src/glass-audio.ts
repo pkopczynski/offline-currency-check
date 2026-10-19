@@ -71,6 +71,8 @@ export function defaultContext(): AudioContextLike | null {
   return Ctor ? new Ctor() : null;
 }
 
+export type GlassAudio = ReturnType<typeof createGlassAudio>;
+
 export function createGlassAudio(
   createContext: () => AudioContextLike | null = defaultContext,
   random: () => number = Math.random,
