@@ -231,11 +231,17 @@ input[aria-invalid="true"] { border-color: var(--color-error); }
 .source a { color: var(--color-accent); text-underline-offset: 2px; }
 
 
-/* Theme control */
+/* Header buttons and popups (theme and Manage currencies) */
 
-.theme-menu { position: relative; flex: none; }
+/* The popups anchor to this right-aligned row, so each one fits the screen whichever button opened it. */
+.header-actions {
+  position: relative;
+  flex: none;
+  display: flex;
+  gap: var(--space-2);
+}
 
-.theme-icon {
+.icon, .theme-icon {
   width: 1.35rem;
   height: 1.35rem;
   fill: none;
@@ -245,7 +251,9 @@ input[aria-invalid="true"] { border-color: var(--color-error); }
   stroke-linejoin: round;
 }
 
-.theme-toggle {
+.icon-fill { fill: color-mix(in srgb, currentColor 20%, transparent); }
+
+.icon-toggle {
   position: relative;
   display: grid;
   place-items: center;
@@ -264,12 +272,12 @@ input[aria-invalid="true"] { border-color: var(--color-error); }
   transition: transform var(--duration-base) var(--ease-spring), border-color var(--duration-fast) var(--ease), var(--theme-fade);
 }
 
-.theme-toggle:hover { border-color: var(--color-accent); }
+.icon-toggle:hover { border-color: var(--color-accent); }
 
 /* Pressed-in glass while the popup is open (aria-expanded, so every way of closing it
    restores the button): a dimmed accent tint with an inset shadow on a layer behind the icons.
    The accent follows the current theme and palette variant; the icon keeps full contrast. */
-.theme-toggle::after {
+.icon-toggle::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -283,14 +291,14 @@ input[aria-invalid="true"] { border-color: var(--color-error); }
   opacity: 0;
   transition: opacity var(--duration-base) var(--ease), var(--theme-fade);
 }
-.theme-toggle[aria-expanded="true"] {
+.icon-toggle[aria-expanded="true"] {
   border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
   transform: scale(0.96);
 }
-.theme-toggle[aria-expanded="true"]::after { opacity: 1; }
-.theme-toggle[aria-expanded="true"]:hover { border-color: var(--color-accent); }
+.icon-toggle[aria-expanded="true"]::after { opacity: 1; }
+.icon-toggle[aria-expanded="true"]:hover { border-color: var(--color-accent); }
 
-.theme-toggle:active {
+.icon-toggle:active {
   transform: scale(0.88);
   transition: transform var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease), var(--theme-fade);
 }
@@ -321,7 +329,7 @@ input[aria-invalid="true"] { border-color: var(--color-error); }
 }
 :root[data-theme-mode="auto"] .theme-toggle-auto { transform: scale(1); }
 
-.theme-popup {
+.popup {
   position: absolute;
   top: calc(100% + var(--space-2));
   right: 0;
@@ -334,6 +342,7 @@ input[aria-invalid="true"] { border-color: var(--color-error); }
   box-shadow: var(--shadow-popup);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  /* Grows from the button that opened it. */
   transform-origin: calc(100% - 1.5rem) 0;
   /* Closed: invisible and out of the tab order and accessibility tree (visibility), but
      still animatable, and interruptible mid-way in both directions. */
@@ -348,7 +357,7 @@ input[aria-invalid="true"] { border-color: var(--color-error); }
     var(--theme-fade);
 }
 
-.theme-popup[data-open="true"] {
+.popup[data-open="true"] {
   visibility: visible;
   opacity: 1;
   transform: none;
@@ -359,6 +368,73 @@ input[aria-invalid="true"] { border-color: var(--color-error); }
     visibility 0s,
     var(--theme-fade);
 }
+
+/* The currencies button sits one button and gap left of the popups' right edge. */
+.currencies-popup {
+  width: min(20rem, calc(100vw - 2 * var(--space-4) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  display: grid;
+  gap: var(--space-3);
+  transform-origin: calc(100% - 1.5rem - var(--tap-target) - var(--space-2)) 0;
+}
+
+.popup-title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+}
+
+/* Scrolls on its own when many currencies are added, keeping the add select in view. */
+.currency-list {
+  max-height: min(50vh, 18rem);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+
+.currency-item {
+  display: grid;
+  grid-template-columns: 3.25rem 1fr auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  border-bottom: 1px solid var(--color-surface-border);
+}
+.currency-item:last-child { border-bottom: 0; }
+
+.currency-code { font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; }
+
+.currency-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.currency-remove {
+  display: grid;
+  place-items: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease), var(--theme-fade);
+}
+.currency-remove:hover:not(:disabled) { background-color: color-mix(in srgb, var(--color-accent) 14%, transparent); }
+.currency-remove:focus-visible { outline: 3px solid var(--color-focus); outline-offset: -3px; }
+.currency-remove:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.add-currency:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .theme-modes {
   position: relative;

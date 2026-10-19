@@ -16,7 +16,7 @@ export interface MyCurrenciesState {
 const DEFAULT_CURRENCIES: readonly SupportedCurrency[] = ['EUR', 'PLN', 'TRY'];
 const DEFAULT_FROM: SupportedCurrency = 'EUR';
 const DEFAULT_TO: SupportedCurrency = 'PLN';
-const MIN_CURRENCIES = 2;
+export const MIN_CURRENCIES = 2;
 
 const defaultState = (): MyCurrenciesState =>
   ({ currencies: [...DEFAULT_CURRENCIES], from: DEFAULT_FROM, to: DEFAULT_TO });

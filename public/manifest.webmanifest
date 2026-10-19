@@ -2,7 +2,7 @@
   "id": "./",
   "name": "Currency Converter",
   "short_name": "Converter",
-  "description": "Offline-first currency converter for EUR, PLN and TRY.",
+  "description": "Offline-first converter between European Central Bank currencies.",
   "lang": "en",
   "start_url": "./",
   "scope": "./",
