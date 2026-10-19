@@ -11,15 +11,16 @@ const V1_CURRENCIES = ['EUR', 'PLN', 'TRY'] as const;
 export type Rates = Partial<Record<SupportedCurrency, number>>;
 
 export const BASE = 'EUR' satisfies SupportedCurrency;
-export const CACHE_KEY = 'fx-rates-v1';
-export const SCHEMA = 1;
+export const CACHE_KEY = 'fx-rates-v2';
+export const SCHEMA = 2;
 export const API_URL =
   'https://api.frankfurter.dev/v1/latest?base=EUR&symbols=' +
   SUPPORTED_CURRENCIES.filter((c) => c !== BASE).join(',');
 export const FETCH_TIMEOUT_MS = 8000;
 
 export interface CacheEntry {
-  schema: typeof SCHEMA;
+  // 2 for entries this version writes; 1 for a legacy EUR/PLN/TRY entry read as a fallback.
+  schema: typeof SCHEMA | 1;
   provider: 'frankfurter';
   base: typeof BASE;
   rates: Rates;
@@ -81,18 +82,32 @@ export function validateRates(payload: unknown): { rates: Rates; rateDate: strin
   return found > 0 ? { rates, rateDate: payload.date } : null;
 }
 
+// Checks the fields shared by every schema; `validRates` checks the rate map.
 function isValidEntry(entry: unknown): entry is CacheEntry {
   if (!isRecord(entry)) return false;
-  const { rates } = entry;
   return (
-    entry.schema === SCHEMA &&
+    (entry.schema === SCHEMA || entry.schema === 1) &&
     entry.base === BASE &&
     typeof entry.rateDate === 'string' &&
     typeof entry.fetchedAt === 'string' &&
     !Number.isNaN(Date.parse(entry.fetchedAt)) &&
-    isRecord(rates) &&
-    V1_CURRENCIES.every((c) => isPositiveNumber(rates[c]))
+    isRecord(entry.rates) &&
+    (entry.schema === SCHEMA ? isValidV2Rates(entry.rates) : isValidV1Rates(entry.rates))
   );
+}
+
+// v2: a partial map; every stored rate must be valid, with the base and at least one other currency.
+function isValidV2Rates(rates: Record<string, unknown>): boolean {
+  return (
+    Object.values(rates).every(isPositiveNumber) &&
+    isPositiveNumber(rates[BASE]) &&
+    SUPPORTED_CURRENCIES.some((c) => c !== BASE && c in rates)
+  );
+}
+
+// v1: always exactly EUR, PLN and TRY.
+function isValidV1Rates(rates: Record<string, unknown>): boolean {
+  return V1_CURRENCIES.every((c) => isPositiveNumber(rates[c]));
 }
 
 export function loadCache(storage: KeyValueStorage): CacheEntry | null {
@@ -100,7 +115,7 @@ export function loadCache(storage: KeyValueStorage): CacheEntry | null {
     const raw = storage.getItem(CACHE_KEY);
     if (!raw) return null;
     const entry: unknown = JSON.parse(raw);
-    return isValidEntry(entry) ? entry : null;
+    return isValidEntry(entry) && entry.schema === SCHEMA ? entry : null;
   } catch {
     return null;
   }
