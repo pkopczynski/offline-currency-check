@@ -3,6 +3,7 @@
 import type { GlassAudio } from './glass-audio.ts';
 import type { CurrencyOptions } from './my-currencies.ts';
 import { initPopup } from './popup.ts';
+import { byId } from './dom.ts';
 
 export interface CurrenciesMenuHandlers {
   // Both re-render the menu synchronously (through render) when the change goes through.
@@ -12,12 +13,6 @@ export interface CurrenciesMenuHandlers {
 
 export interface CurrenciesMenu {
   render(options: CurrencyOptions, canRemove: boolean): void;
-}
-
-function byId<T extends HTMLElement>(id: string, type: new () => T): T {
-  const el = document.getElementById(id);
-  if (!(el instanceof type)) throw new Error(`Missing #${id}`);
-  return el;
 }
 
 export function initCurrenciesMenu(audio: GlassAudio, handlers: CurrenciesMenuHandlers): CurrenciesMenu {

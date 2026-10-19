@@ -6,6 +6,7 @@ import { startAmbientLight } from './ambient-light.ts';
 import type { AmbientLightHandle } from './ambient-light.ts';
 import type { KeyValueStorage } from './rates.ts';
 import { initPopup } from './popup.ts';
+import { byId } from './dom.ts';
 import {
   DEFAULT_AUTO_CONFIG, THEME_MODES, cssTimeToMs, isThemeMode, loadPrefs, nextClockChange, pickVariant, resolveAuto, savePrefs,
 } from './theme.ts';
@@ -22,12 +23,6 @@ const STALE_READING_MS = 3000;
 const REVEAL_COVERAGE = 0.88;
 
 interface Point { x: number; y: number }
-
-function byId<T extends HTMLElement>(id: string, type: new () => T): T {
-  const el = document.getElementById(id);
-  if (!(el instanceof type)) throw new Error(`Missing #${id}`);
-  return el;
-}
 
 const pad = (hour: number) => `${String(hour).padStart(2, '0')}:00`;
 

@@ -1,4 +1,5 @@
 import './styles/main.css';
+import { byId } from './dom.ts';
 import {
   loadCache, refreshRates, convert, parseAmount, formatAge,
 } from './rates.ts';
@@ -13,12 +14,6 @@ import {
 import { initCurrenciesMenu } from './currencies-control.ts';
 import type { CurrenciesMenu } from './currencies-control.ts';
 import type { CurrencyOption, MyCurrenciesState } from './my-currencies.ts';
-
-function byId<T extends HTMLElement>(id: string, type: new () => T): T {
-  const el = document.getElementById(id);
-  if (!(el instanceof type)) throw new Error(`Missing #${id}`);
-  return el;
-}
 
 const form = byId('converter', HTMLFormElement);
 const amountInput = byId('amount', HTMLInputElement);
