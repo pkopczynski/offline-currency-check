@@ -56,15 +56,14 @@ function renderCurrencySelects() {
 
 // An add or remove from the Manage currencies popup. The selects are rebuilt rather than sent a
 // `change`, so a removal that switches From or To plays no tap.
-function applyCurrencies(next: MyCurrenciesState, sound: 'pop' | 'inhale') {
+function applyCurrencies(next: MyCurrenciesState, playSound: () => void) {
   if (next === myCurrencies) return; // add/remove return the same state when nothing changed
   myCurrencies = next;
   saveMyCurrencies(storage, myCurrencies);
   renderCurrencySelects();
   renderResult();
   // Only reached on a real change, so a refused removal (disabled ×) stays silent.
-  if (sound === 'pop') audio.pop();
-  else audio.inhale();
+  playSound();
 }
 
 const noMenu: CurrenciesMenu = { render() {} };
@@ -72,8 +71,8 @@ const noMenu: CurrenciesMenu = { render() {} };
 const currenciesMenu: CurrenciesMenu = (() => {
   try {
     return initCurrenciesMenu(audio, {
-      add: (code) => applyCurrencies(addCurrency(myCurrencies, code), 'pop'),
-      remove: (code) => applyCurrencies(removeCurrency(myCurrencies, code), 'inhale'),
+      add: (code) => applyCurrencies(addCurrency(myCurrencies, code), audio.pop),
+      remove: (code) => applyCurrencies(removeCurrency(myCurrencies, code), audio.inhale),
     });
   } catch (err) {
     console.warn('Currencies menu setup failed:', err);
