@@ -128,7 +128,12 @@ describe('fetchRates', () => {
     const fetchFn: FetchFn = async (url, init) => { calledUrl = url; return okFetch()(url, init); };
     const entry = await fetchRates({ fetchFn, now: () => NOW });
     assert.equal(calledUrl, API_URL);
-    assert.equal(API_URL, 'https://api.frankfurter.dev/v1/latest?base=EUR&symbols=PLN,TRY');
+    assert.equal(
+      API_URL,
+      'https://api.frankfurter.dev/v1/latest?base=EUR&symbols=' +
+        'AUD,BRL,CAD,CHF,CNY,CZK,DKK,GBP,HKD,HUF,IDR,ILS,INR,ISK,JPY,KRW,' +
+        'MXN,MYR,NOK,NZD,PHP,PLN,RON,SEK,SGD,THB,TRY,USD,ZAR',
+    );
     assert.deepEqual(entry, {
       schema: SCHEMA, provider: 'frankfurter', base: 'EUR', rates: RATES,
       rateDate: '2026-10-07', fetchedAt: '2026-10-07T20:41:12.000Z',

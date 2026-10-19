@@ -1,16 +1,19 @@
 // Exchange-rate logic with no DOM access, so it runs in the browser and in Node tests.
 // Storage, fetch and clock are passed in as parameters.
 
+import { SUPPORTED_CURRENCIES } from './supported-currencies.ts';
+import type { SupportedCurrency } from './supported-currencies.ts';
+
 export const CURRENCIES = ['EUR', 'PLN', 'TRY'] as const;
 export type Currency = (typeof CURRENCIES)[number];
 export type Rates = Record<Currency, number>;
 
-export const BASE = 'EUR' satisfies Currency;
+export const BASE = 'EUR' satisfies SupportedCurrency;
 export const CACHE_KEY = 'fx-rates-v1';
 export const SCHEMA = 1;
 export const API_URL =
   'https://api.frankfurter.dev/v1/latest?base=EUR&symbols=' +
-  CURRENCIES.filter((c) => c !== BASE).join(',');
+  SUPPORTED_CURRENCIES.filter((c) => c !== BASE).join(',');
 export const FETCH_TIMEOUT_MS = 8000;
 
 export interface CacheEntry {
