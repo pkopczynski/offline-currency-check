@@ -1,11 +1,11 @@
 // Theme control: popup UI, applying the theme to the page, and the Auto-mode inputs
 // (ambient light sensor, clock, foreground changes). Pure decisions live in theme.ts.
-import { createGlassAudio } from './glass-audio.ts';
 import type { GlassAudio } from './glass-audio.ts';
 import { startAmbientLight } from './ambient-light.ts';
 import type { AmbientLightHandle } from './ambient-light.ts';
-import type { KeyValueStorage } from './rates.ts';
+import type { KeyValueStorage } from './storage.ts';
 import { initPopup } from './popup.ts';
+import { byId } from './dom.ts';
 import {
   DEFAULT_AUTO_CONFIG, THEME_MODES, cssTimeToMs, isThemeMode, loadPrefs, nextClockChange, pickVariant, resolveAuto, savePrefs,
 } from './theme.ts';
@@ -23,15 +23,9 @@ const REVEAL_COVERAGE = 0.88;
 
 interface Point { x: number; y: number }
 
-function byId<T extends HTMLElement>(id: string, type: new () => T): T {
-  const el = document.getElementById(id);
-  if (!(el instanceof type)) throw new Error(`Missing #${id}`);
-  return el;
-}
-
 const pad = (hour: number) => `${String(hour).padStart(2, '0')}:00`;
 
-export function initTheme(storage: KeyValueStorage, audio: GlassAudio = createGlassAudio()) {
+export function initTheme(storage: KeyValueStorage, audio: GlassAudio) {
   const root = document.documentElement;
   const menu = byId('theme-menu', HTMLElement);
   const toggle = byId('theme-toggle', HTMLButtonElement);

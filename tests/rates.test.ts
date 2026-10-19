@@ -5,7 +5,8 @@ import {
   validateRates, loadCache, saveCache, fetchRates, refreshRates,
   convert, parseAmount, formatAge,
 } from '../src/rates.ts';
-import type { CacheEntry, FetchFn, KeyValueStorage } from '../src/rates.ts';
+import type { CacheEntry, FetchFn } from '../src/rates.ts';
+import type { KeyValueStorage } from '../src/storage.ts';
 
 const RATES = { EUR: 1, PLN: 4.3825, TRY: 54.9822 };
 const API_PAYLOAD = { amount: 1.0, base: 'EUR', date: '2026-10-07', rates: { PLN: 4.3825, TRY: 54.9822 } };
@@ -143,6 +144,10 @@ describe('cache', () => {
   test('a v1 entry missing one of EUR, PLN and TRY is ignored', () => {
     const broken = { ...v1Entry, rates: { EUR: 1, PLN: 4.38 } };
     assert.equal(loadCache(memoryStorage({ [V1_KEY]: JSON.stringify(broken) })), null);
+  });
+
+  test('an entry under the v1 key that is not schema 1 is ignored', () => {
+    assert.equal(loadCache(memoryStorage({ [V1_KEY]: JSON.stringify(validEntry()) })), null);
   });
 
   test('a valid v2 entry wins over a v1 entry', () => {

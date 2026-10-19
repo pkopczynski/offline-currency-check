@@ -3,6 +3,7 @@
 import type { GlassAudio } from './glass-audio.ts';
 import type { CurrencyOptions } from './my-currencies.ts';
 import { initPopup } from './popup.ts';
+import { byId } from './dom.ts';
 
 export interface CurrenciesMenuHandlers {
   // Both re-render the menu synchronously (through render) when the change goes through.
@@ -12,12 +13,6 @@ export interface CurrenciesMenuHandlers {
 
 export interface CurrenciesMenu {
   render(options: CurrencyOptions, canRemove: boolean): void;
-}
-
-function byId<T extends HTMLElement>(id: string, type: new () => T): T {
-  const el = document.getElementById(id);
-  if (!(el instanceof type)) throw new Error(`Missing #${id}`);
-  return el;
 }
 
 export function initCurrenciesMenu(audio: GlassAudio, handlers: CurrenciesMenuHandlers): CurrenciesMenu {
@@ -51,15 +46,12 @@ export function initCurrenciesMenu(audio: GlassAudio, handlers: CurrenciesMenuHa
 
   return {
     render({ mine, addable }, canRemove) {
-      list.replaceChildren(...mine.map(({ code, name }) => {
+      list.replaceChildren(...mine.map(({ code, label }) => {
         const item = document.createElement('li');
         item.className = 'currency-item';
-        const codeEl = document.createElement('span');
-        codeEl.className = 'currency-code';
-        codeEl.textContent = code;
-        const nameEl = document.createElement('span');
-        nameEl.className = 'currency-name';
-        nameEl.textContent = name;
+        const labelEl = document.createElement('span');
+        labelEl.className = 'currency-label';
+        labelEl.textContent = label;
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'currency-remove';
@@ -67,7 +59,7 @@ export function initCurrenciesMenu(audio: GlassAudio, handlers: CurrenciesMenuHa
         button.disabled = !canRemove;
         button.setAttribute('aria-label', `Remove ${code}`);
         button.textContent = '×';
-        item.append(codeEl, nameEl, button);
+        item.append(labelEl, button);
         return item;
       }));
 
