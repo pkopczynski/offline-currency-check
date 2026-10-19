@@ -51,15 +51,12 @@ export function initCurrenciesMenu(audio: GlassAudio, handlers: CurrenciesMenuHa
 
   return {
     render({ mine, addable }, canRemove) {
-      list.replaceChildren(...mine.map(({ code, name }) => {
+      list.replaceChildren(...mine.map(({ code, label }) => {
         const item = document.createElement('li');
         item.className = 'currency-item';
-        const codeEl = document.createElement('span');
-        codeEl.className = 'currency-code';
-        codeEl.textContent = code;
-        const nameEl = document.createElement('span');
-        nameEl.className = 'currency-name';
-        nameEl.textContent = name;
+        const labelEl = document.createElement('span');
+        labelEl.className = 'currency-label';
+        labelEl.textContent = label;
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'currency-remove';
@@ -67,7 +64,7 @@ export function initCurrenciesMenu(audio: GlassAudio, handlers: CurrenciesMenuHa
         button.disabled = !canRemove;
         button.setAttribute('aria-label', `Remove ${code}`);
         button.textContent = '×';
-        item.append(codeEl, nameEl, button);
+        item.append(labelEl, button);
         return item;
       }));
 
