@@ -4,7 +4,9 @@
 // everything above ~6.5 kHz is filtered out, so it stays soft. The AudioContext is created
 // on the first tap, which always happens inside a user gesture (autoplay policy).
 // Every tap uses one of six voices, chosen at random but never the same one twice in a row.
-// Without Web Audio the taps are silent no-ops. There is no sound setting: the app had none.
+// Two more sounds share the same context: a soft, low pop (a currency added) and a short inhale
+// (a currency removed). Each varies its pitch randomly by ±5% and is no louder than a tap.
+// Without Web Audio every sound is a silent no-op. There is no sound setting: the app had none.
 
 // The subset of the Web Audio API used here, so tests can pass a fake and the module stays DOM-free.
 interface ParamLike {
@@ -62,6 +64,17 @@ const LOWPASS_HZ = 6500;
 const CLICK_SECONDS = 0.01;
 const FADE_OUT_SECONDS = 0.015;
 
+// Pop and inhale: their peaks stay below the tap's click level (PEAK * 0.9), so they are never louder.
+const PITCH_SPREAD = 0.05;
+const POP_FROM_HZ = 380;
+const POP_TO_HZ = 160;
+const POP_PEAK = 0.08;
+const POP_SECONDS = 0.09;
+const INHALE_FROM_HZ = 600;
+const INHALE_TO_HZ = 2400;
+const INHALE_PEAK = 0.07;
+const INHALE_SECONDS = 0.22;
+
 export function defaultContext(): AudioContextLike | null {
   const g = globalThis as unknown as {
     AudioContext?: new () => AudioContextLike;
@@ -71,6 +84,8 @@ export function defaultContext(): AudioContextLike | null {
   return Ctor ? new Ctor() : null;
 }
 
+export type GlassAudio = ReturnType<typeof createGlassAudio>;
+
 export function createGlassAudio(
   createContext: () => AudioContextLike | null = defaultContext,
   random: () => number = Math.random,
@@ -78,6 +93,7 @@ export function createGlassAudio(
   let ctx: AudioContextLike | null = null;
   let disabled = false;
   let noise: BufferLike | null = null;
+  let breath: BufferLike | null = null;
   let lastVoice = -1;
   // Output of the tap that is still ringing; cut short by the next one so taps never pile up.
   let current: (NodeLike & { gain: ParamLike }) | null = null;
@@ -161,17 +177,77 @@ export function createGlassAudio(
     }
   }
 
+  // A random pitch factor within ±PITCH_SPREAD, so repeated pops and inhales don't sound mechanical.
+  const pitch = () => 1 + (Math.min(Math.max(random(), 0), 1) * 2 - 1) * PITCH_SPREAD;
+
+  // Soft, low pop (a currency added): a sine falling quickly from ~380 to ~160 Hz.
+  function playPop(c: AudioContextLike) {
+    const start = c.currentTime + 0.002;
+    const k = pitch();
+    const osc = c.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(POP_FROM_HZ * k, start);
+    osc.frequency.exponentialRampToValueAtTime(POP_TO_HZ * k, start + 0.06);
+    const env = c.createGain();
+    env.gain.setValueAtTime(0, start);
+    env.gain.linearRampToValueAtTime(POP_PEAK, start + 0.005);
+    env.gain.exponentialRampToValueAtTime(0.0001, start + POP_SECONDS);
+    osc.connect(env);
+    env.connect(c.destination);
+    osc.start(start);
+    osc.stop(start + POP_SECONDS + 0.01);
+    osc.onended = () => env.disconnect();
+  }
+
+  function inhaleBuffer(c: AudioContextLike): BufferLike {
+    if (breath) return breath;
+    const length = Math.max(1, Math.round(c.sampleRate * INHALE_SECONDS));
+    breath = c.createBuffer(1, length, c.sampleRate);
+    const data = breath.getChannelData(0);
+    for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+    return breath;
+  }
+
+  // Short inhale (a currency removed): noise through a band-pass sweeping up from ~600 to
+  // ~2400 Hz, swelling in and then cut off quickly.
+  function playInhale(c: AudioContextLike) {
+    const start = c.currentTime + 0.002;
+    const end = start + INHALE_SECONDS;
+    const k = pitch();
+    const noiseSource = c.createBufferSource();
+    noiseSource.buffer = inhaleBuffer(c);
+    const band = c.createBiquadFilter();
+    band.type = 'bandpass';
+    band.Q.value = 1.2;
+    band.frequency.setValueAtTime(INHALE_FROM_HZ * k, start);
+    band.frequency.exponentialRampToValueAtTime(INHALE_TO_HZ * k, end - 0.02);
+    const env = c.createGain();
+    env.gain.setValueAtTime(0, start);
+    env.gain.linearRampToValueAtTime(INHALE_PEAK, end - 0.04);
+    env.gain.linearRampToValueAtTime(0, end);
+    noiseSource.connect(band);
+    band.connect(env);
+    env.connect(c.destination);
+    noiseSource.start(start);
+    noiseSource.stop(end + 0.01);
+    noiseSource.onended = () => env.disconnect();
+  }
+
+  function run(sound: (c: AudioContextLike) => void) {
+    const c = getContext();
+    if (!c) return;
+    try {
+      // Autoplay policy: the context starts suspended until a gesture has resumed it.
+      if (c.state === 'suspended') c.resume().catch(() => {});
+      sound(c);
+    } catch {
+      disabled = true; // Broken audio stack: stay silent rather than throw on every click.
+    }
+  }
+
   return {
-    tap() {
-      const c = getContext();
-      if (!c) return;
-      try {
-        // Autoplay policy: the context starts suspended until a gesture has resumed it.
-        if (c.state === 'suspended') c.resume().catch(() => {});
-        play(c);
-      } catch {
-        disabled = true; // Broken audio stack: stay silent rather than throw on every click.
-      }
-    },
+    tap() { run(play); },
+    pop() { run(playPop); },
+    inhale() { run(playInhale); },
   };
 }

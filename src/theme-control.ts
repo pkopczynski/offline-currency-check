@@ -1,9 +1,11 @@
 // Theme control: popup UI, applying the theme to the page, and the Auto-mode inputs
 // (ambient light sensor, clock, foreground changes). Pure decisions live in theme.ts.
-import { createGlassAudio } from './glass-audio.ts';
+import type { GlassAudio } from './glass-audio.ts';
 import { startAmbientLight } from './ambient-light.ts';
 import type { AmbientLightHandle } from './ambient-light.ts';
-import type { KeyValueStorage } from './rates.ts';
+import type { KeyValueStorage } from './storage.ts';
+import { initPopup } from './popup.ts';
+import { byId } from './dom.ts';
 import {
   DEFAULT_AUTO_CONFIG, THEME_MODES, cssTimeToMs, isThemeMode, loadPrefs, nextClockChange, pickVariant, resolveAuto, savePrefs,
 } from './theme.ts';
@@ -21,15 +23,9 @@ const REVEAL_COVERAGE = 0.88;
 
 interface Point { x: number; y: number }
 
-function byId<T extends HTMLElement>(id: string, type: new () => T): T {
-  const el = document.getElementById(id);
-  if (!(el instanceof type)) throw new Error(`Missing #${id}`);
-  return el;
-}
-
 const pad = (hour: number) => `${String(hour).padStart(2, '0')}:00`;
 
-export function initTheme(storage: KeyValueStorage) {
+export function initTheme(storage: KeyValueStorage, audio: GlassAudio) {
   const root = document.documentElement;
   const menu = byId('theme-menu', HTMLElement);
   const toggle = byId('theme-toggle', HTMLButtonElement);
@@ -37,14 +33,12 @@ export function initTheme(storage: KeyValueStorage) {
   const modes = popup.querySelector<HTMLElement>('.theme-modes');
   const radios = [...popup.querySelectorAll<HTMLInputElement>('input[name="theme-mode"]')];
   if (!modes || radios.length !== THEME_MODES.length) throw new Error('Theme popup markup is incomplete');
-  const audio = createGlassAudio();
 
   const prefs = loadPrefs(storage);
   // The inline script in index.html already applied a theme before first paint.
   let theme: Theme = root.dataset.theme === 'light' ? 'light' : 'dark';
   let source: ThemeSource = 'manual';
   let lux: number | null = null;
-  let open = false;
 
   let sensor: AmbientLightHandle | null = null;
   let sensorBlocked = false; // unsupported or denied: do not try again this session
@@ -255,20 +249,6 @@ export function initTheme(storage: KeyValueStorage) {
     evaluate(true, toggleOrigin());
   }
 
-  function setOpen(next: boolean, restoreFocus = false) {
-    if (open === next) return;
-    open = next;
-    popup.dataset.open = String(next);
-    toggle.setAttribute('aria-expanded', String(next));
-    if (next) radios.find((r) => r.checked)?.focus({ preventScroll: true });
-    else if (restoreFocus) toggle.focus({ preventScroll: true });
-  }
-
-  toggle.addEventListener('click', () => {
-    audio.tap();
-    setOpen(!open);
-  });
-
   modes.addEventListener('change', (event) => {
     const value = (event.target as HTMLInputElement).value;
     if (!isThemeMode(value) || value === prefs.mode) return;
@@ -276,18 +256,12 @@ export function initTheme(storage: KeyValueStorage) {
     setMode(value);
   });
 
-  document.addEventListener('pointerdown', (event) => {
+  initPopup({
+    menu, toggle, popup, audio,
+    focusOnOpen: () => radios.find((r) => r.checked),
     // During a View Transition the browser may target taps at <html> (its overlay) even where
     // the popup is; main.css lets them through, and this keeps such a tap from closing it.
-    if (transitioning && event.target === root) return;
-    if (open && event.target instanceof Node && !menu.contains(event.target)) setOpen(false);
-  });
-  document.addEventListener('keydown', (event) => {
-    if (open && event.key === 'Escape') setOpen(false, true);
-  });
-  menu.addEventListener('focusout', (event) => {
-    // Tabbing out of the popup closes it. (Focus moving to nowhere is covered by pointerdown.)
-    if (open && event.relatedTarget instanceof Node && !menu.contains(event.relatedTarget)) setOpen(false);
+    ignorePointerDown: (event) => transitioning && event.target === root,
   });
 
   document.addEventListener('visibilitychange', onVisibilityChange);

@@ -1,6 +1,6 @@
 // Theme selection logic. No DOM access, so it is unit tested in Node.
 // "Mode" is what the user chose (dark / light / auto); "theme" is what is shown.
-import type { KeyValueStorage } from './rates.ts';
+import type { KeyValueStorage } from './storage.ts';
 
 export type ThemeMode = 'dark' | 'light' | 'auto';
 export type Theme = 'dark' | 'light';

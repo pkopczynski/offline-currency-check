@@ -6,7 +6,7 @@ import {
   THEME_KEY, VARIANT_COUNT, DEFAULT_AUTO_CONFIG as CFG,
   loadPrefs, savePrefs, themeFromClock, nextClockChange, themeFromLux, resolveAuto, pickVariant, cssTimeToMs,
 } from '../src/theme.ts';
-import type { KeyValueStorage } from '../src/rates.ts';
+import type { KeyValueStorage } from '../src/storage.ts';
 
 function memoryStorage(initial: Record<string, string> = {}) {
   const data: Record<string, string> = { ...initial };

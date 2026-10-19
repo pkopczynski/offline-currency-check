@@ -1,20 +1,30 @@
 // Exchange-rate logic with no DOM access, so it runs in the browser and in Node tests.
 // Storage, fetch and clock are passed in as parameters.
 
-export const CURRENCIES = ['EUR', 'PLN', 'TRY'] as const;
-export type Currency = (typeof CURRENCIES)[number];
-export type Rates = Record<Currency, number>;
+import { SUPPORTED_CURRENCIES } from './supported-currencies.ts';
+import type { SupportedCurrency } from './supported-currencies.ts';
+import type { KeyValueStorage } from './storage.ts';
 
-export const BASE = 'EUR' satisfies Currency;
-export const CACHE_KEY = 'fx-rates-v1';
-export const SCHEMA = 1;
+// The currencies cached by schema 1 (before every Supported currency was fetched).
+const V1_CURRENCIES = ['EUR', 'PLN', 'TRY'] as const;
+
+// Rates per 1 EUR, keyed by currency code. Partial: the ECB may not publish every currency.
+export type Rates = Partial<Record<SupportedCurrency, number>>;
+
+export const BASE = 'EUR' satisfies SupportedCurrency;
+export const CACHE_KEY = 'fx-rates-v2';
+export const SCHEMA = 2;
+const V1_SCHEMA = 1;
+// Legacy cache (EUR, PLN and TRY only), read as a fallback until the first v2 fetch is saved.
+const V1_CACHE_KEY = 'fx-rates-v1';
 export const API_URL =
   'https://api.frankfurter.dev/v1/latest?base=EUR&symbols=' +
-  CURRENCIES.filter((c) => c !== BASE).join(',');
+  SUPPORTED_CURRENCIES.filter((c) => c !== BASE).join(',');
 export const FETCH_TIMEOUT_MS = 8000;
 
 export interface CacheEntry {
-  schema: typeof SCHEMA;
+  // 2 for entries this version writes; 1 for a legacy EUR/PLN/TRY entry read as a fallback.
+  schema: typeof SCHEMA | typeof V1_SCHEMA;
   provider: 'frankfurter';
   base: typeof BASE;
   rates: Rates;
@@ -28,12 +38,6 @@ export type RefreshResult =
   | { status: 'current'; entry: CacheEntry }
   | { status: 'cached'; entry: CacheEntry; reason: FailureReason }
   | { status: 'unavailable'; entry: null; reason: FailureReason };
-
-// The subset of Web Storage we use; localStorage and in-memory fakes both fit.
-export interface KeyValueStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-}
 
 // The subset of fetch we use; window.fetch fits.
 export interface FetchResponse {
@@ -55,7 +59,8 @@ export class RateFetchError extends Error {
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
 const isPositiveNumber = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0;
 
-// Turns a Frankfurter response into our rate map, or returns null if anything is wrong.
+// Turns a Frankfurter response into our rate map, or returns null if it's unusable.
+// Invalid or unknown rates are dropped; at least one valid rate besides the base is required.
 export function validateRates(payload: unknown): { rates: Rates; rateDate: string } | null {
   if (!isRecord(payload)) return null;
   if (payload.base !== BASE) return null;
@@ -63,36 +68,65 @@ export function validateRates(payload: unknown): { rates: Rates; rateDate: strin
   const source = payload.rates;
   if (!isRecord(source)) return null;
 
-  const rates: Partial<Rates> = { [BASE]: 1 };
-  for (const code of CURRENCIES) {
+  const rates: Rates = { [BASE]: 1 };
+  let found = 0;
+  for (const code of SUPPORTED_CURRENCIES) {
     if (code === BASE) continue;
     const rate = source[code];
-    if (!isPositiveNumber(rate)) return null;
+    if (!isPositiveNumber(rate)) continue;
     rates[code] = rate;
+    found++;
   }
-  return { rates: rates as Rates, rateDate: payload.date };
+  return found > 0 ? { rates, rateDate: payload.date } : null;
 }
 
-function isValidEntry(entry: unknown): entry is CacheEntry {
+// An entry of any known schema, or only of `schema` when given. The fields are shared by every
+// schema; the rate map is checked by that schema's validator.
+function isValidEntry(entry: unknown, schema?: CacheEntry['schema']): entry is CacheEntry {
   if (!isRecord(entry)) return false;
-  const { rates } = entry;
+  const validRates = RATE_VALIDATORS.get(entry.schema);
   return (
-    entry.schema === SCHEMA &&
+    validRates !== undefined &&
+    (schema === undefined || entry.schema === schema) &&
     entry.base === BASE &&
     typeof entry.rateDate === 'string' &&
     typeof entry.fetchedAt === 'string' &&
     !Number.isNaN(Date.parse(entry.fetchedAt)) &&
-    isRecord(rates) &&
-    CURRENCIES.every((c) => isPositiveNumber(rates[c]))
+    isRecord(entry.rates) &&
+    validRates(entry.rates)
   );
 }
 
+// v2: a partial map; every stored rate must be valid, with the base and at least one other currency.
+function isValidV2Rates(rates: Record<string, unknown>): boolean {
+  return (
+    Object.values(rates).every(isPositiveNumber) &&
+    isPositiveNumber(rates[BASE]) &&
+    SUPPORTED_CURRENCIES.some((c) => c !== BASE && c in rates)
+  );
+}
+
+// v1: always exactly EUR, PLN and TRY.
+function isValidV1Rates(rates: Record<string, unknown>): boolean {
+  return V1_CURRENCIES.every((c) => isPositiveNumber(rates[c]));
+}
+
+const RATE_VALIDATORS = new Map<unknown, (rates: Record<string, unknown>) => boolean>([
+  [SCHEMA, isValidV2Rates],
+  [V1_SCHEMA, isValidV1Rates],
+]);
+
+// Prefers a valid v2 entry; otherwise a valid v1 entry, so users upgrading offline keep their rates.
 export function loadCache(storage: KeyValueStorage): CacheEntry | null {
+  return readEntry(storage, CACHE_KEY, SCHEMA) ?? readEntry(storage, V1_CACHE_KEY, V1_SCHEMA);
+}
+
+function readEntry(storage: KeyValueStorage, key: string, schema: CacheEntry['schema']): CacheEntry | null {
   try {
-    const raw = storage.getItem(CACHE_KEY);
+    const raw = storage.getItem(key);
     if (!raw) return null;
     const entry: unknown = JSON.parse(raw);
-    return isValidEntry(entry) ? entry : null;
+    return isValidEntry(entry, schema) ? entry : null;
   } catch {
     return null;
   }

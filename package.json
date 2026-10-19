@@ -2,7 +2,7 @@
   "name": "currency-converter-pwa",
   "version": "0.1.0",
   "private": true,
-  "description": "Offline-first currency converter PWA for EUR, PLN and TRY.",
+  "description": "Offline-first currency converter PWA for European Central Bank currencies.",
   "type": "module",
   "engines": {
     "node": ">=22.18"

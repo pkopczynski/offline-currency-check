@@ -1,15 +1,20 @@
 import './styles/main.css';
+import { byId } from './dom.ts';
 import {
   loadCache, refreshRates, convert, parseAmount, formatAge,
 } from './rates.ts';
-import type { CacheEntry, FailureReason, KeyValueStorage, RefreshResult } from './rates.ts';
+import type { CacheEntry, FailureReason, RefreshResult } from './rates.ts';
+import type { KeyValueStorage } from './storage.ts';
 import { initTheme } from './theme-control.ts';
-
-function byId<T extends HTMLElement>(id: string, type: new () => T): T {
-  const el = document.getElementById(id);
-  if (!(el instanceof type)) throw new Error(`Missing #${id}`);
-  return el;
-}
+import { createGlassAudio } from './glass-audio.ts';
+import { preferredLocale } from './locale.ts';
+import {
+  MIN_CURRENCIES, add as addCurrency, load as loadMyCurrencies, remove as removeCurrency,
+  save as saveMyCurrencies, options as currencyOptions,
+} from './my-currencies.ts';
+import { initCurrenciesMenu } from './currencies-control.ts';
+import type { CurrenciesMenu } from './currencies-control.ts';
+import type { CurrencyOption, MyCurrenciesState } from './my-currencies.ts';
 
 const form = byId('converter', HTMLFormElement);
 const amountInput = byId('amount', HTMLInputElement);
@@ -32,8 +37,61 @@ const storage: KeyValueStorage = (() => {
   try { return window.localStorage; } catch { return null; }
 })() || { getItem: () => null, setItem: () => { throw new Error('no storage'); } };
 
+const audio = createGlassAudio();
+
 // Theming is optional: if it fails to start, the converter must still work.
-try { initTheme(storage); } catch (err) { console.warn('Theme setup failed:', err); }
+try { initTheme(storage, audio); } catch (err) { console.warn('Theme setup failed:', err); }
+
+let myCurrencies: MyCurrenciesState = loadMyCurrencies(storage);
+
+function fillSelect(select: HTMLSelectElement, entries: CurrencyOption[], selected: string) {
+  select.replaceChildren(...entries.map(({ code, label }) => new Option(label, code, false, code === selected)));
+}
+
+function renderCurrencySelects() {
+  const options = currencyOptions(myCurrencies, preferredLocale(navigator));
+  fillSelect(fromSelect, options.mine, myCurrencies.from);
+  fillSelect(toSelect, options.mine, myCurrencies.to);
+  currenciesMenu.render(options, myCurrencies.currencies.length > MIN_CURRENCIES);
+}
+
+// An add or remove from the Manage currencies popup. The selects are rebuilt rather than sent a
+// `change`, so a removal that switches From or To plays no tap.
+function applyCurrencies(next: MyCurrenciesState, playSound: () => void) {
+  if (next === myCurrencies) return; // add/remove return the same state when nothing changed
+  myCurrencies = next;
+  saveMyCurrencies(storage, myCurrencies);
+  renderCurrencySelects();
+  renderResult();
+  // Only reached on a real change, so a refused removal (disabled ×) stays silent.
+  playSound();
+}
+
+const noMenu: CurrenciesMenu = { render() {} };
+// Like theming, managing currencies is optional: if it fails to start, the converter must still work.
+const currenciesMenu: CurrenciesMenu = (() => {
+  try {
+    return initCurrenciesMenu(audio, {
+      add: (code) => applyCurrencies(addCurrency(myCurrencies, code), audio.pop),
+      remove: (code) => applyCurrencies(removeCurrency(myCurrencies, code), audio.inhale),
+    });
+  } catch (err) {
+    console.warn('Currencies menu setup failed:', err);
+    return noMenu;
+  }
+})();
+
+// `change` only fires when the user picks a different currency, so the tap never plays for a no-op.
+function onPairChange() {
+  const from = myCurrencies.currencies.find((c) => c === fromSelect.value);
+  const to = myCurrencies.currencies.find((c) => c === toSelect.value);
+  if (from && to) {
+    myCurrencies = { ...myCurrencies, from, to };
+    saveMyCurrencies(storage, myCurrencies);
+  }
+  audio.tap();
+  renderResult();
+}
 
 const formatMoney = (value: number, currency: string) =>
   new Intl.NumberFormat(undefined, {
@@ -73,6 +131,14 @@ function renderResult() {
   if (!rates) {
     resultEl.textContent = '—';
     rateEl.textContent = state.status === 'loading' ? '' : 'No exchange rates available yet.';
+    return;
+  }
+
+  // convert() gives null for a currency with no rate, even for an amount of 1.
+  const missing = [from, to].find((code) => convert(1, code, code, rates) === null);
+  if (missing) {
+    resultEl.textContent = '—';
+    rateEl.textContent = `No rate for ${missing} in the saved rates. Refresh while online.`;
     return;
   }
 
@@ -131,8 +197,8 @@ async function refresh() {
 
 form.addEventListener('submit', (e) => e.preventDefault());
 amountInput.addEventListener('input', renderResult);
-fromSelect.addEventListener('change', renderResult);
-toSelect.addEventListener('change', renderResult);
+fromSelect.addEventListener('change', onPairChange);
+toSelect.addEventListener('change', onPairChange);
 refreshButton.addEventListener('click', refresh);
 // Keep the "x min ago" label accurate.
 setInterval(renderStatus, 60_000);
@@ -140,6 +206,7 @@ setInterval(renderStatus, 60_000);
 // Show cached rates immediately, then try to fetch fresh ones.
 const cached = loadCache(storage);
 if (cached) state = { status: 'cached', entry: cached };
+renderCurrencySelects();
 render();
 refresh();
 

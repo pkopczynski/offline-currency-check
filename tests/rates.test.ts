@@ -1,15 +1,18 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CACHE_KEY, SCHEMA, API_URL,
+  API_URL,
   validateRates, loadCache, saveCache, fetchRates, refreshRates,
   convert, parseAmount, formatAge,
 } from '../src/rates.ts';
-import type { CacheEntry, FetchFn, KeyValueStorage } from '../src/rates.ts';
+import type { CacheEntry, FetchFn } from '../src/rates.ts';
+import type { KeyValueStorage } from '../src/storage.ts';
 
 const RATES = { EUR: 1, PLN: 4.3825, TRY: 54.9822 };
 const API_PAYLOAD = { amount: 1.0, base: 'EUR', date: '2026-10-07', rates: { PLN: 4.3825, TRY: 54.9822 } };
 const NOW = Date.parse('2026-10-07T20:41:12.000Z');
+const V1_KEY = 'fx-rates-v1';
+const V2_KEY = 'fx-rates-v2';
 
 function memoryStorage(initial: Record<string, string> = {}) {
   const data: Record<string, string> = { ...initial };
@@ -23,7 +26,7 @@ function memoryStorage(initial: Record<string, string> = {}) {
 const okFetch = (payload: unknown = API_PAYLOAD): FetchFn => async () => ({ ok: true, status: 200, json: async () => payload });
 // Overrides may deliberately break the entry (wrong schema, missing rates, ...), hence the cast.
 const validEntry = (overrides: Record<string, unknown> = {}) => ({
-  schema: SCHEMA, provider: 'frankfurter', base: 'EUR', rates: { ...RATES },
+  schema: 2, provider: 'frankfurter', base: 'EUR', rates: { ...RATES, USD: 1.1225 },
   rateDate: '2026-10-06', fetchedAt: '2026-10-06T18:00:00.000Z', ...overrides,
 }) as CacheEntry;
 
@@ -47,6 +50,13 @@ describe('convert', () => {
   test('zero and decimals', () => {
     assert.equal(convert(0, 'EUR', 'PLN', RATES), 0);
     close(convert(0.5, 'EUR', 'PLN', RATES), 2.19125);
+  });
+
+  test('a Supported currency missing from the rates returns null', () => {
+    const partial = { EUR: 1, PLN: 4.3825 };
+    assert.equal(convert(1, 'EUR', 'USD', partial), null);
+    assert.equal(convert(1, 'USD', 'PLN', partial), null);
+    assert.equal(convert(1, 'USD', 'USD', partial), null);
   });
 
   test('invalid input returns null', () => {
@@ -84,35 +94,72 @@ describe('validateRates', () => {
     assert.deepEqual(validateRates(API_PAYLOAD), { rates: RATES, rateDate: '2026-10-07' });
   });
 
-  test('rejects malformed payloads', () => {
+  test('keeps the valid rates and drops invalid, unknown or missing ones', () => {
+    const payload = {
+      ...API_PAYLOAD,
+      rates: { PLN: 4.3825, TRY: '54.98', USD: 0, GBP: -1, JPY: Infinity, XYZ: 2, CHF: 0.93, EUR: 7 },
+    };
+    assert.deepEqual(validateRates(payload), { rates: { EUR: 1, PLN: 4.3825, CHF: 0.93 }, rateDate: '2026-10-07' });
+  });
+
+  test('rejects malformed payloads and payloads with no non-base rate', () => {
     const cases = [
       null, 'x', {},
       { ...API_PAYLOAD, base: 'USD' },
       { ...API_PAYLOAD, date: 'yesterday' },
       { ...API_PAYLOAD, rates: null },
-      { ...API_PAYLOAD, rates: { PLN: 4.38 } },
-      { ...API_PAYLOAD, rates: { PLN: '4.38', TRY: 54.98 } },
-      { ...API_PAYLOAD, rates: { PLN: 0, TRY: 54.98 } },
-      { ...API_PAYLOAD, rates: { PLN: -4.38, TRY: 54.98 } },
-      { ...API_PAYLOAD, rates: { PLN: Infinity, TRY: 54.98 } },
+      { ...API_PAYLOAD, rates: {} },
+      { ...API_PAYLOAD, rates: { EUR: 1 } },
+      { ...API_PAYLOAD, rates: { PLN: '4.38', TRY: 0, XYZ: 3 } },
     ];
     for (const c of cases) assert.equal(validateRates(c), null, JSON.stringify(c));
   });
 });
 
 describe('cache', () => {
-  test('save and load round-trip', () => {
+  test('save and load round-trip a v2 entry with a partial rate map', () => {
     const storage = memoryStorage();
     assert.equal(saveCache(storage, validEntry()), true);
+    assert.deepEqual(Object.keys(storage.data), [V2_KEY]);
+    assert.equal(JSON.parse(storage.data[V2_KEY]!).schema, 2);
     assert.deepEqual(loadCache(storage), validEntry());
   });
 
   test('missing, corrupt or wrong-schema data gives null', () => {
     assert.equal(loadCache(memoryStorage()), null);
-    assert.equal(loadCache(memoryStorage({ [CACHE_KEY]: '{not json' })), null);
-    assert.equal(loadCache(memoryStorage({ [CACHE_KEY]: JSON.stringify(validEntry({ schema: 99 })) })), null);
-    assert.equal(loadCache(memoryStorage({ [CACHE_KEY]: JSON.stringify(validEntry({ rates: { EUR: 1 } })) })), null);
-    assert.equal(loadCache(memoryStorage({ [CACHE_KEY]: JSON.stringify(validEntry({ fetchedAt: 'nope' })) })), null);
+    assert.equal(loadCache(memoryStorage({ [V2_KEY]: '{not json' })), null);
+    assert.equal(loadCache(memoryStorage({ [V2_KEY]: JSON.stringify(validEntry({ schema: 99 })) })), null);
+    assert.equal(loadCache(memoryStorage({ [V2_KEY]: JSON.stringify(validEntry({ schema: 1 })) })), null);
+    assert.equal(loadCache(memoryStorage({ [V2_KEY]: JSON.stringify(validEntry({ rates: { EUR: 1 } })) })), null);
+    assert.equal(loadCache(memoryStorage({ [V2_KEY]: JSON.stringify(validEntry({ rates: { EUR: 1, PLN: -4 } })) })), null);
+    assert.equal(loadCache(memoryStorage({ [V2_KEY]: JSON.stringify(validEntry({ fetchedAt: 'nope' })) })), null);
+  });
+
+  const v1Entry = { ...validEntry({ schema: 1, rates: { ...RATES } }) };
+
+  test('a valid v1 entry is loaded when there is no v2 entry', () => {
+    assert.deepEqual(loadCache(memoryStorage({ [V1_KEY]: JSON.stringify(v1Entry) })), v1Entry);
+  });
+
+  test('a v1 entry missing one of EUR, PLN and TRY is ignored', () => {
+    const broken = { ...v1Entry, rates: { EUR: 1, PLN: 4.38 } };
+    assert.equal(loadCache(memoryStorage({ [V1_KEY]: JSON.stringify(broken) })), null);
+  });
+
+  test('an entry under the v1 key that is not schema 1 is ignored', () => {
+    assert.equal(loadCache(memoryStorage({ [V1_KEY]: JSON.stringify(validEntry()) })), null);
+  });
+
+  test('a valid v2 entry wins over a v1 entry', () => {
+    const storage = memoryStorage({ [V1_KEY]: JSON.stringify(v1Entry), [V2_KEY]: JSON.stringify(validEntry()) });
+    assert.deepEqual(loadCache(storage), validEntry());
+  });
+
+  test('a broken v2 entry falls back to a valid v1 entry', () => {
+    for (const broken of ['{not json', JSON.stringify(validEntry({ rates: { EUR: 1 } }))]) {
+      const storage = memoryStorage({ [V1_KEY]: JSON.stringify(v1Entry), [V2_KEY]: broken });
+      assert.deepEqual(loadCache(storage), v1Entry, broken);
+    }
   });
 
   test('storage errors do not throw', () => {
@@ -128,9 +175,14 @@ describe('fetchRates', () => {
     const fetchFn: FetchFn = async (url, init) => { calledUrl = url; return okFetch()(url, init); };
     const entry = await fetchRates({ fetchFn, now: () => NOW });
     assert.equal(calledUrl, API_URL);
-    assert.equal(API_URL, 'https://api.frankfurter.dev/v1/latest?base=EUR&symbols=PLN,TRY');
+    assert.equal(
+      API_URL,
+      'https://api.frankfurter.dev/v1/latest?base=EUR&symbols=' +
+        'AUD,BRL,CAD,CHF,CNY,CZK,DKK,GBP,HKD,HUF,IDR,ILS,INR,ISK,JPY,KRW,' +
+        'MXN,MYR,NOK,NZD,PHP,PLN,RON,SEK,SGD,THB,TRY,USD,ZAR',
+    );
     assert.deepEqual(entry, {
-      schema: SCHEMA, provider: 'frankfurter', base: 'EUR', rates: RATES,
+      schema: 2, provider: 'frankfurter', base: 'EUR', rates: RATES,
       rateDate: '2026-10-07', fetchedAt: '2026-10-07T20:41:12.000Z',
     });
   });
@@ -167,27 +219,40 @@ describe('refreshRates', () => {
   const failures: Record<'network' | 'http' | 'invalid', FetchFn> = {
     network: async () => { throw new TypeError('Failed to fetch'); },
     http: async () => ({ ok: false, status: 500, json: async () => ({}) }),
-    invalid: okFetch({ base: 'EUR', date: '2026-10-07', rates: { PLN: 4.38 } }),
+    invalid: okFetch({ base: 'EUR', date: '2026-10-07', rates: {} }),
   };
 
   for (const [reason, fetchFn] of Object.entries(failures)) {
     test(`${reason} failure falls back to cache and leaves it unchanged`, async () => {
       const before = JSON.stringify(validEntry());
-      const storage = memoryStorage({ [CACHE_KEY]: before });
+      const storage = memoryStorage({ [V2_KEY]: before });
       const result = await refreshRates({ storage, fetchFn, now: () => NOW });
       assert.equal(result.status, 'cached');
       assert.equal(result.reason, reason);
       assert.deepEqual(result.entry, validEntry());
-      assert.equal(storage.data[CACHE_KEY], before);
+      assert.equal(storage.data[V2_KEY], before);
     });
   }
 
   test('unparseable JSON counts as invalid', async () => {
-    const storage = memoryStorage({ [CACHE_KEY]: JSON.stringify(validEntry()) });
+    const storage = memoryStorage({ [V2_KEY]: JSON.stringify(validEntry()) });
     const fetchFn: FetchFn = async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad'); } });
     const result = await refreshRates({ storage, fetchFn, now: () => NOW });
     assert.equal(result.status, 'cached');
     assert.equal(result.reason, 'invalid');
+  });
+
+  test('a v1 cache is used while offline and replaced by the next successful fetch', async () => {
+    const v1Entry = validEntry({ schema: 1, rates: { ...RATES } });
+    const storage = memoryStorage({ [V1_KEY]: JSON.stringify(v1Entry) });
+
+    const offline = await refreshRates({ storage, fetchFn: failures.network, now: () => NOW });
+    assert.deepEqual(offline, { status: 'cached', entry: v1Entry, reason: 'network' });
+
+    const online = await refreshRates({ storage, fetchFn: okFetch(), now: () => NOW });
+    assert.equal(online.status, 'current');
+    assert.equal(online.entry.schema, 2);
+    assert.deepEqual(loadCache(storage), online.entry);
   });
 
   test('failure with no cache reports unavailable', async () => {
@@ -208,7 +273,7 @@ describe('refreshRates', () => {
     const older = validEntry({ fetchedAt: '2026-10-05T10:00:00.000Z' });
     const newer = validEntry({ fetchedAt: '2026-10-07T10:00:00.000Z' });
     const run = (stored: CacheEntry, fallback: CacheEntry) => refreshRates({
-      storage: memoryStorage({ [CACHE_KEY]: JSON.stringify(stored) }),
+      storage: memoryStorage({ [V2_KEY]: JSON.stringify(stored) }),
       fetchFn: failures.network, now: () => NOW, fallback,
     });
     assert.deepEqual((await run(older, newer)).entry, newer);

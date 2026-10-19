@@ -1,6 +1,7 @@
 # Currency Converter PWA
 
-A small offline-first currency converter for **EUR**, **PLN** and **TRY**.
+A small offline-first converter between the currencies the European Central Bank publishes
+reference rates for.
 
 - Exchange rates come from [Frankfurter](https://frankfurter.dev/) (European Central Bank
   reference rates, published once per working day around 16:00 CET). No API key needed.
@@ -10,6 +11,8 @@ A small offline-first currency converter for **EUR**, **PLN** and **TRY**.
 - After one successful online visit, the app works fully offline (service worker) and can
   be installed as a standalone app on Android and other platforms.
 
+- **My currencies**: the coins button in the top-right corner opens **Manage currencies**,
+  where currencies are added and removed (see [My currencies](#my-currencies)).
 - Light, dark and automatic theme, chosen from the icon in the top-right corner
   (see [Theme](#theme)).
 
@@ -45,10 +48,13 @@ npm run build && npx vite preview --base /offline-currency-check/
 index.html               page markup (Vite entry)
 src/main.ts              UI: DOM wiring and rendering
 src/rates.ts             exchange-rate logic (no DOM; unit tested)
+src/my-currencies.ts     My currencies and the From/To pair: load, save, add, remove, dropdown entries (no DOM; unit tested)
+src/currencies-control.ts  Manage currencies popup
+src/popup.ts             header popup behaviour shared by both popups (open/close, Escape, tap outside, one at a time)
 src/theme.ts             theme decisions: clock schedule, light thresholds, variants, prefs (no DOM; unit tested)
 src/theme-control.ts     theme popup, applying themes, Auto-mode inputs and transitions
 src/ambient-light.ts     AmbientLightSensor wrapper
-src/glass-audio.ts       synthesized glass-tap sounds (Web Audio)
+src/glass-audio.ts       synthesized glass-tap, pop and inhale sounds (Web Audio)
 src/sw.ts                service worker, built to dist/sw.js
 src/styles/tokens.css    design tokens (palette, light/dark themes and variants, spacing, radii, type, glass, motion)
 src/styles/main.css      layout and components, using only semantic tokens
@@ -57,6 +63,23 @@ scripts/check-dist.ts    post-build checks (precache list, relative URLs, manife
 scripts/generate-icons.ts  renders public/icons/* (npm run icons)
 tests/                   unit tests
 ```
+
+## My currencies
+
+The coins button in the top-right corner (before the theme button) opens **Manage
+currencies**. It lists My currencies, each with a × button, and an **Add currency…** select
+with every Supported currency not yet added. Picking one adds it at once; removing is refused
+below two currencies (the × buttons are disabled). Adding leaves From/To alone; removing the
+currency shown in From or To switches that side to the first remaining currency, by code, that
+isn't on the other side. My currencies and the From/To pair are stored in `localStorage`
+(`my-currencies-v1`). Rates for every Supported currency are cached on each refresh (ADR 0001),
+so a currency added offline converts straight away from the saved rates.
+
+The popup behaves like the theme popup: Escape and tapping outside close it, the button looks
+pressed in while it is open, a glass tap plays on open and close, and opening either popup
+closes the other. Adding a currency plays a soft, low pop and removing one a short inhale
+(both synthesized, with a slight random pitch variation, no louder than the taps). A disabled ×
+makes no sound, and a removal that switches From or To plays only the inhale.
 
 ## Theme
 
@@ -131,3 +154,26 @@ Actions**. The app is then served at `https://<user>.github.io/<repo>/`.
 8. Theme: Dark and Light override the clock; Auto follows the clock (change the device time to
    check); the choice survives a reload; Escape and tapping outside close the popup; with
    reduced motion enabled the theme changes instantly.
+9. Upgrade while offline: with a build that saved `fx-rates-v1` loaded once, deploy this
+   version, go offline and reload → status shows **Cached** with the old rates. Back online,
+   **Refresh rates** saves `fx-rates-v2` with every currency the ECB publishes.
+10. From/To: a first visit shows EUR, PLN and TRY with EUR → PLN; picking a different currency
+    in From or To plays a glass tap (re-picking the current one doesn't); reload → the From/To
+    pair is kept.
+11. Manage currencies: go offline, open the coins popup, add a currency → it appears in From
+    and To straight away and converts from the saved rates; From/To don't change; the select
+    goes back to **Add currency…**.
+12. Remove currencies until 2 remain → both × buttons are disabled and do nothing.
+13. Remove the currency shown in From (and, separately, in To) → that side switches to the
+    first remaining currency, by code, that isn't on the other side.
+14. Reload → My currencies and the From/To pair are kept.
+15. With one popup open, press the other popup's button → the first closes and the second
+    opens; Escape and tapping outside close the currencies popup; Tab and the keyboard reach
+    every × and the add select.
+16. Device language: switch the browser/device language (e.g. to Polish) and reload → the
+    currency names in From/To and the currencies popup follow it (e.g. "CHF – frank szwajcarski"),
+    still sorted by code; all other text stays in English.
+17. Sounds (with the volume up): opening and closing the coins popup plays a glass tap; adding
+    a currency plays a soft, low pop; removing one plays a short inhale; repeating either sounds
+    slightly different in pitch; neither is louder than the taps. A disabled × makes no sound.
+    Removing the currency shown in From or To plays only the inhale, with no extra tap.
