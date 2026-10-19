@@ -145,6 +145,10 @@ describe('cache', () => {
     assert.equal(loadCache(memoryStorage({ [V1_KEY]: JSON.stringify(broken) })), null);
   });
 
+  test('an entry under the v1 key that is not schema 1 is ignored', () => {
+    assert.equal(loadCache(memoryStorage({ [V1_KEY]: JSON.stringify(validEntry()) })), null);
+  });
+
   test('a valid v2 entry wins over a v1 entry', () => {
     const storage = memoryStorage({ [V1_KEY]: JSON.stringify(v1Entry), [V2_KEY]: JSON.stringify(validEntry()) });
     assert.deepEqual(loadCache(storage), validEntry());

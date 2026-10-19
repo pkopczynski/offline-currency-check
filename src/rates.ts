@@ -13,6 +13,7 @@ export type Rates = Partial<Record<SupportedCurrency, number>>;
 export const BASE = 'EUR' satisfies SupportedCurrency;
 export const CACHE_KEY = 'fx-rates-v2';
 export const SCHEMA = 2;
+const V1_SCHEMA = 1;
 // Legacy cache (EUR, PLN and TRY only), read as a fallback until the first v2 fetch is saved.
 const V1_CACHE_KEY = 'fx-rates-v1';
 export const API_URL =
@@ -22,7 +23,7 @@ export const FETCH_TIMEOUT_MS = 8000;
 
 export interface CacheEntry {
   // 2 for entries this version writes; 1 for a legacy EUR/PLN/TRY entry read as a fallback.
-  schema: typeof SCHEMA | 1;
+  schema: typeof SCHEMA | typeof V1_SCHEMA;
   provider: 'frankfurter';
   base: typeof BASE;
   rates: Rates;
@@ -84,17 +85,20 @@ export function validateRates(payload: unknown): { rates: Rates; rateDate: strin
   return found > 0 ? { rates, rateDate: payload.date } : null;
 }
 
-// Checks the fields shared by every schema; `validRates` checks the rate map.
-function isValidEntry(entry: unknown): entry is CacheEntry {
+// An entry of any known schema, or only of `schema` when given. The fields are shared by every
+// schema; the rate map is checked by that schema's validator.
+function isValidEntry(entry: unknown, schema?: CacheEntry['schema']): entry is CacheEntry {
   if (!isRecord(entry)) return false;
+  const validRates = RATE_VALIDATORS.get(entry.schema);
   return (
-    (entry.schema === SCHEMA || entry.schema === 1) &&
+    validRates !== undefined &&
+    (schema === undefined || entry.schema === schema) &&
     entry.base === BASE &&
     typeof entry.rateDate === 'string' &&
     typeof entry.fetchedAt === 'string' &&
     !Number.isNaN(Date.parse(entry.fetchedAt)) &&
     isRecord(entry.rates) &&
-    (entry.schema === SCHEMA ? isValidV2Rates(entry.rates) : isValidV1Rates(entry.rates))
+    validRates(entry.rates)
   );
 }
 
@@ -112,9 +116,14 @@ function isValidV1Rates(rates: Record<string, unknown>): boolean {
   return V1_CURRENCIES.every((c) => isPositiveNumber(rates[c]));
 }
 
+const RATE_VALIDATORS = new Map<unknown, (rates: Record<string, unknown>) => boolean>([
+  [SCHEMA, isValidV2Rates],
+  [V1_SCHEMA, isValidV1Rates],
+]);
+
 // Prefers a valid v2 entry; otherwise a valid v1 entry, so users upgrading offline keep their rates.
 export function loadCache(storage: KeyValueStorage): CacheEntry | null {
-  return readEntry(storage, CACHE_KEY, SCHEMA) ?? readEntry(storage, V1_CACHE_KEY, 1);
+  return readEntry(storage, CACHE_KEY, SCHEMA) ?? readEntry(storage, V1_CACHE_KEY, V1_SCHEMA);
 }
 
 function readEntry(storage: KeyValueStorage, key: string, schema: CacheEntry['schema']): CacheEntry | null {
@@ -122,7 +131,7 @@ function readEntry(storage: KeyValueStorage, key: string, schema: CacheEntry['sc
     const raw = storage.getItem(key);
     if (!raw) return null;
     const entry: unknown = JSON.parse(raw);
-    return isValidEntry(entry) && entry.schema === schema ? entry : null;
+    return isValidEntry(entry, schema) ? entry : null;
   } catch {
     return null;
   }
