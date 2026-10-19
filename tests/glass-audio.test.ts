@@ -3,14 +3,22 @@ import assert from 'node:assert/strict';
 import { VOICES, createGlassAudio, pickVoice } from '../src/glass-audio.ts';
 import type { AudioContextLike } from '../src/glass-audio.ts';
 
-// A recording stand-in for the Web Audio API.
+// A recording stand-in for the Web Audio API. Params remember every value they are set or ramped to.
 function fakeContext(state = 'running') {
-  const log = { oscillators: [] as { freq: number; stopAt: number | undefined }[], sources: 0, resumes: 0, disconnects: 0, gains: [] as { rampsToZero: number }[] };
+  const log = {
+    oscillators: [] as { freq: number; freqs: number[]; stopAt: number | undefined }[],
+    sources: 0, resumes: 0, disconnects: 0,
+    gains: [] as { rampsToZero: number; values: number[] }[],
+    filters: [] as { type: string; freqs: number[] }[],
+  };
   const param = (initial = 0) => {
+    let current = initial;
     const p = {
-      value: initial, ramps: [] as number[],
+      ramps: [] as number[], values: [initial] as number[],
+      get value() { return current; }, set value(v: number) { current = v; p.values.push(v); },
       setValueAtTime(v: number) { p.value = v; }, cancelScheduledValues() {},
-      linearRampToValueAtTime(v: number) { p.ramps.push(v); }, exponentialRampToValueAtTime(v: number) { p.ramps.push(v); },
+      linearRampToValueAtTime(v: number) { p.ramps.push(v); p.values.push(v); },
+      exponentialRampToValueAtTime(v: number) { p.ramps.push(v); p.values.push(v); },
     };
     return p;
   };
@@ -18,20 +26,31 @@ function fakeContext(state = 'running') {
   const ctx: AudioContextLike & { state: string } = {
     currentTime: 1, sampleRate: 8000, state, destination: {},
     resume: async () => { log.resumes++; ctx.state = 'running'; },
-    createGain() { const g = { ...node(), gain: param() }; log.gains.push({ get rampsToZero() { return g.gain.ramps.filter((r) => r === 0).length; } }); return g; },
-    createBiquadFilter: () => ({ ...node(), type: '', frequency: param(), Q: param() }),
+    createGain() {
+      const g = { ...node(), gain: param(1) };
+      log.gains.push({ get rampsToZero() { return g.gain.ramps.filter((r) => r === 0).length; }, get values() { return g.gain.values; } });
+      return g;
+    },
+    createBiquadFilter() {
+      const f = { ...node(), type: '', frequency: param(350), Q: param(1) };
+      log.filters.push({ get type() { return f.type; }, get freqs() { return f.frequency.values; } });
+      return f;
+    },
     createOscillator() {
-      const rec = { freq: 0, stopAt: undefined as number | undefined };
+      const frequency = param(440);
+      const rec = { get freq() { return frequency.value; }, get freqs() { return frequency.values.slice(1); }, stopAt: undefined as number | undefined };
       log.oscillators.push(rec);
-      const o = { ...node(), type: '', onended: null as (() => void) | null, frequency: { ...param(), set value(v: number) { rec.freq = v; }, get value() { return rec.freq; } },
-        start() {}, stop(when?: number) { rec.stopAt = when; } };
-      return o;
+      return { ...node(), type: '', onended: null as (() => void) | null, frequency, start() {}, stop(when?: number) { rec.stopAt = when; } };
     },
     createBuffer: (_c, length) => ({ getChannelData: () => new Float32Array(length) }),
     createBufferSource() { log.sources++; return { ...node(), buffer: null, onended: null, start() {}, stop() {} }; },
   };
   return { ctx, log };
 }
+
+// The loudest level any gain stage is set or ramped to, ignoring unity (pass-through) gains.
+const loudest = (log: ReturnType<typeof fakeContext>['log']) =>
+  Math.max(0, ...log.gains.flatMap((g) => g.values).filter((v) => v !== 1));
 
 describe('glass audio', () => {
   test('does nothing until the first tap (autoplay policy: no context before a gesture)', () => {
@@ -127,5 +146,92 @@ describe('glass audio', () => {
     const broken = createGlassAudio(() => { created++; return ctx; });
     assert.doesNotThrow(() => { broken.tap(); broken.tap(); });
     assert.equal(created, 1);
+  });
+
+  describe('pop and inhale', () => {
+    test('create no audio context before the first gesture', () => {
+      let created = 0;
+      createGlassAudio(() => { created++; return null; });
+      assert.equal(created, 0);
+    });
+
+    test('the pop is a short sine whose pitch drops from about 380 to 160 Hz, no louder than a tap', () => {
+      const tap = fakeContext();
+      createGlassAudio(() => tap.ctx, () => 0.5).tap();
+      const { ctx, log } = fakeContext('suspended');
+      createGlassAudio(() => ctx, () => 0.5).pop();
+      assert.equal(log.resumes, 1);
+      assert.equal(log.oscillators.length, 1);
+      const freqs = log.oscillators[0]!.freqs;
+      assert.ok(Math.abs(freqs[0]! - 380) < 1, 'starts near 380 Hz');
+      assert.ok(Math.abs(freqs.at(-1)! - 160) < 1, 'ends near 160 Hz');
+      assert.ok(log.oscillators[0]!.stopAt! - ctx.currentTime <= 0.12, 'about 90 ms');
+      assert.ok(loudest(log) > 0 && loudest(log) <= loudest(tap.log), 'no louder than a tap');
+    });
+
+    test('the pop pitch varies by up to ±5% with the random source', () => {
+      const startFreq = (r: number) => {
+        const { ctx, log } = fakeContext();
+        createGlassAudio(() => ctx, () => r).pop();
+        return log.oscillators[0]!.freqs[0]!;
+      };
+      const low = startFreq(0) / 380;
+      const high = startFreq(0.999999) / 380;
+      assert.ok(low >= 0.949 && low < 0.96, `lowest pitch ${low}`);
+      assert.ok(high <= 1.051 && high > 1.04, `highest pitch ${high}`);
+    });
+
+    test('the inhale is band-passed noise sweeping up from about 600 to 2400 Hz, no louder than a tap', () => {
+      const tap = fakeContext();
+      createGlassAudio(() => tap.ctx, () => 0.5).tap();
+      const { ctx, log } = fakeContext('suspended');
+      createGlassAudio(() => ctx, () => 0.5).inhale();
+      assert.equal(log.resumes, 1);
+      assert.equal(log.oscillators.length, 0);
+      assert.equal(log.sources, 1);
+      const band = log.filters.find((f) => f.type === 'bandpass')!;
+      const sweep = band.freqs.slice(1);
+      assert.ok(Math.abs(sweep[0]! - 600) < 1, 'starts near 600 Hz');
+      assert.ok(Math.abs(sweep.at(-1)! - 2400) < 1, 'ends near 2400 Hz');
+      assert.ok(loudest(log) > 0 && loudest(log) <= loudest(tap.log), 'no louder than a tap');
+    });
+
+    test('the inhale pitch varies by up to ±5% with the random source', () => {
+      const sweepStart = (r: number) => {
+        const { ctx, log } = fakeContext();
+        createGlassAudio(() => ctx, () => r).inhale();
+        return log.filters.find((f) => f.type === 'bandpass')!.freqs[1]!;
+      };
+      const low = sweepStart(0) / 600;
+      const high = sweepStart(0.999999) / 600;
+      assert.ok(low >= 0.949 && low < 0.96, `lowest pitch ${low}`);
+      assert.ok(high <= 1.051 && high > 1.04, `highest pitch ${high}`);
+    });
+
+    test('share the one AudioContext with the taps', () => {
+      const { ctx } = fakeContext();
+      let created = 0;
+      const audio = createGlassAudio(() => { created++; return ctx; });
+      audio.pop(); audio.inhale(); audio.tap(); audio.inhale(); audio.pop();
+      assert.equal(created, 1);
+    });
+
+    test('are silent and never throw without Web Audio or with a broken context', () => {
+      let created = 0;
+      const none = createGlassAudio(() => { created++; return null; });
+      assert.doesNotThrow(() => { none.pop(); none.inhale(); none.tap(); });
+      assert.equal(created, 1);
+
+      const throwing = createGlassAudio(() => { throw new Error('NotSupportedError'); });
+      assert.doesNotThrow(() => { throwing.pop(); throwing.inhale(); });
+
+      for (const sound of ['pop', 'inhale'] as const) {
+        const { ctx, log } = fakeContext();
+        ctx.createGain = () => { throw new Error('boom'); };
+        const broken = createGlassAudio(() => ctx);
+        assert.doesNotThrow(() => { broken[sound](); broken[sound](); broken.tap(); });
+        assert.equal(log.oscillators.length + log.sources <= 1, true, 'gives up after the first failure');
+      }
+    });
   });
 });
