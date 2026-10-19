@@ -51,6 +51,13 @@ describe('convert', () => {
     close(convert(0.5, 'EUR', 'PLN', RATES), 2.19125);
   });
 
+  test('a Supported currency missing from the rates returns null', () => {
+    const partial = { EUR: 1, PLN: 4.3825 };
+    assert.equal(convert(1, 'EUR', 'USD', partial), null);
+    assert.equal(convert(1, 'USD', 'PLN', partial), null);
+    assert.equal(convert(1, 'USD', 'USD', partial), null);
+  });
+
   test('invalid input returns null', () => {
     assert.equal(convert(-1, 'EUR', 'PLN', RATES), null);
     assert.equal(convert(NaN, 'EUR', 'PLN', RATES), null);
