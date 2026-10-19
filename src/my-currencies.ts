@@ -69,3 +69,13 @@ export function add(state: MyCurrenciesState, code: string): MyCurrenciesState {
   if (!isSupportedCurrency(code) || state.currencies.includes(code)) return state;
   return { ...state, currencies: [...state.currencies, code].sort() };
 }
+
+// Removes a currency, never going below two. A side that showed it switches to the first
+// remaining currency, alphabetically, that isn't on the other side.
+export function remove(state: MyCurrenciesState, code: string): MyCurrenciesState {
+  if (state.currencies.length <= MIN_CURRENCIES || !state.currencies.includes(code as SupportedCurrency)) return state;
+  const currencies = state.currencies.filter((c) => c !== code);
+  const from = state.from === code ? firstOther(currencies, state.to === code ? null : state.to) : state.from;
+  const to = state.to === code ? firstOther(currencies, from) : state.to;
+  return { currencies, from, to };
+}

@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { MY_CURRENCIES_KEY, load, save, add } from '../src/my-currencies.ts';
+import { MY_CURRENCIES_KEY, load, save, add, remove } from '../src/my-currencies.ts';
 import type { KeyValueStorage } from '../src/rates.ts';
 
 function memoryStorage(initial: Record<string, string> = {}) {
@@ -118,5 +118,49 @@ describe('add', () => {
     const before = start();
     add(before, 'GBP');
     assert.deepEqual(before, state);
+  });
+});
+
+describe('remove', () => {
+  type Codes = Parameters<typeof remove>[0]['currencies'];
+  const state = (currencies: Codes, from: Codes[number], to: Codes[number]) => ({ currencies, from, to });
+
+  test('removes a currency that is on neither side', () => {
+    assert.deepEqual(
+      remove(state(['EUR', 'PLN', 'TRY'], 'EUR', 'PLN'), 'TRY'),
+      state(['EUR', 'PLN'], 'EUR', 'PLN'),
+    );
+  });
+
+  test('never goes below 2 currencies', () => {
+    assert.deepEqual(remove(state(['EUR', 'PLN'], 'EUR', 'PLN'), 'PLN'), state(['EUR', 'PLN'], 'EUR', 'PLN'));
+  });
+
+  test('does nothing for a code not in the list', () => {
+    assert.deepEqual(
+      remove(state(['EUR', 'PLN', 'TRY'], 'EUR', 'PLN'), 'USD'),
+      state(['EUR', 'PLN', 'TRY'], 'EUR', 'PLN'),
+    );
+  });
+
+  test('switches From to the first remaining currency, alphabetically, not on the To side', () => {
+    assert.deepEqual(
+      remove(state(['EUR', 'GBP', 'PLN', 'USD'], 'PLN', 'EUR'), 'PLN'),
+      state(['EUR', 'GBP', 'USD'], 'GBP', 'EUR'),
+    );
+  });
+
+  test('switches To the same way', () => {
+    assert.deepEqual(
+      remove(state(['EUR', 'GBP', 'PLN', 'USD'], 'EUR', 'USD'), 'USD'),
+      state(['EUR', 'GBP', 'PLN'], 'EUR', 'GBP'),
+    );
+  });
+
+  test('when both sides showed the removed currency, they switch to two different ones', () => {
+    assert.deepEqual(
+      remove(state(['EUR', 'GBP', 'PLN'], 'EUR', 'EUR'), 'EUR'),
+      state(['GBP', 'PLN'], 'GBP', 'PLN'),
+    );
   });
 });
